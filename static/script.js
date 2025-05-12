@@ -306,6 +306,49 @@ function transitionMolecules(fromMolecule, toMolecule, duration = 1.5, includePa
   return tl;
 }
 
+// Switch tab function to handle tab changes
+function switchTab(tabName) {
+  // Update tab buttons
+  document.querySelectorAll('.tab-button').forEach(button => {
+    if (button.getAttribute('data-tab') === tabName) {
+      button.classList.add('bg-blue-900', 'text-white');
+      button.classList.remove('bg-gray-800', 'text-gray-300');
+    } else {
+      button.classList.remove('bg-blue-900', 'text-white');
+      button.classList.add('bg-gray-800', 'text-gray-300');
+    }
+  });
+  
+  // Update tab contents
+  document.querySelectorAll('.tab-content').forEach(content => {
+    if (content.getAttribute('data-tab') === tabName) {
+      content.classList.remove('hidden');
+    } else {
+      content.classList.add('hidden');
+    }
+  });
+  
+  // Hide UI elements when info tab is active
+  const stepNavigator = document.getElementById('step-navigator');
+  const infoButton = document.getElementById('toggle-info-panel');
+  const resetCameraBtn = document.getElementById('reset-camera-btn');
+  const toggleFullscreenBtn = document.getElementById('toggle-fullscreen');
+  
+  if (tabName === 'info') {
+    // Hide elements when info tab is active
+    if (stepNavigator) stepNavigator.classList.add('hidden');
+    if (infoButton) infoButton.classList.add('hidden');
+    if (resetCameraBtn) resetCameraBtn.classList.add('hidden');
+    if (toggleFullscreenBtn) toggleFullscreenBtn.classList.add('hidden');
+  } else {
+    // Show elements when other tabs are active
+    if (stepNavigator) stepNavigator.classList.remove('hidden');
+    if (infoButton) infoButton.classList.remove('hidden');
+    if (resetCameraBtn) resetCameraBtn.classList.remove('hidden');
+    if (toggleFullscreenBtn) toggleFullscreenBtn.classList.remove('hidden');
+  }
+}
+
 function init() {
   setTimeout(hideLoading, 1800); // Slightly longer loading for all enhanced components
 
@@ -342,7 +385,7 @@ function init() {
     alpha: true,
   });
   renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, isMobile() ? 2 : 3)); // Limit pixel ratio on mobile
   renderer.physicallyCorrectLights = true;
   renderer.outputEncoding = THREE.sRGBEncoding;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -354,9 +397,15 @@ function init() {
 
   controls = new THREE.OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
-  controls.dampingFactor = 0.05;
-  controls.rotateSpeed = 0.7;
-  controls.minDistance = 5;
+  controls.dampingFactor = 0.25;
+  controls.rotateSpeed = isMobile() ? 0.7 : 0.5; // Faster rotation on mobile
+  controls.enableZoom = true;
+  controls.zoomSpeed = isMobile() ? 1.2 : 1.0; // Slightly faster zoom on mobile
+  controls.autoRotate = false;
+  controls.autoRotateSpeed = 0.5;
+  controls.enablePan = !isMobile(); // Disable panning on mobile to prevent accidental gestures
+  controls.screenSpacePanning = true;
+  controls.minDistance = isMobile() ? 7 : 5; // Prevent zooming in too close on mobile
   controls.maxDistance = 50;
   controls.maxPolarAngle = Math.PI * 0.95;
 
@@ -369,6 +418,17 @@ function init() {
 
   addEventListeners();
   animate();
+  
+  // Set up initial panel state
+  setTimeout(() => {
+    const infoPanel = document.getElementById('info-panel');
+    
+    if (!isMobile()) {
+      // On desktop, show the panel by default
+      infoPanel.classList.remove('-translate-x-full');
+      infoPanel.classList.add('translate-x-0');
+    }
+  }, 500); // Short delay to ensure DOM is fully loaded
 }
 
 function hideLoading() {
@@ -376,6 +436,21 @@ function hideLoading() {
   loadingScreen.style.opacity = "0";
   setTimeout(() => {
     loadingScreen.style.display = "none";
+    
+    // Show mobile instructions if on mobile
+    if (isMobile()) {
+      // Create a brief tutorial message for mobile users
+      const mobileHint = document.createElement('div');
+      mobileHint.className = 'fixed bottom-[80px] left-1/2 transform -translate-x-1/2 bg-[rgba(0,0,0,0.7)] text-white py-2 px-4 rounded-lg text-center text-sm z-50 backdrop-blur-sm';
+      mobileHint.innerHTML = 'Tap the <i class="fas fa-info"></i> button for molecular details. Pinch to zoom, drag to rotate.';
+      document.body.appendChild(mobileHint);
+      
+      // Remove after 5 seconds
+      setTimeout(() => {
+        mobileHint.style.opacity = '0';
+        setTimeout(() => mobileHint.remove(), 500);
+      }, 5000);
+    }
   }, 500);
 }
 
@@ -391,11 +466,13 @@ function setupPostProcessing() {
   );
   composer.addPass(effectFXAA);
 
-  // bloom for glowing effect
+  // bloom for glowing effect with mobile optimization
+  const bloomStrength = isMobile() ? 0.4 : 0.5; // Reduce bloom strength on mobile
+  const bloomRadius = isMobile() ? 0.3 : 0.4;   // Smaller radius on mobile
   bloomPass = new THREE.UnrealBloomPass(
     new THREE.Vector2(window.innerWidth, window.innerHeight),
-    0.5, // strength
-    0.4, // radius
+    bloomStrength,
+    bloomRadius,
     0.85 // threshold
   );
   composer.addPass(bloomPass);
@@ -437,8 +514,13 @@ function setupLighting() {
   scene.add(pointLight2);
 }
 
+// Helper function to detect mobile devices
+function isMobile() {
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth < 768;
+}
+
 function addEventListeners() {
-  // Remove any existing event listeners to prevent duplicates
+  // Events for next/previous buttons
   const prevBtn = document.getElementById("prev-btn");
   const nextBtn = document.getElementById("next-btn");
   
@@ -450,21 +532,111 @@ function addEventListeners() {
   
   // Add fresh event listeners
   newPrevBtn.addEventListener("click", function(e) {
-    console.log("Previous button clicked");
     e.preventDefault();
     previousStep();
   });
   
   newNextBtn.addEventListener("click", function(e) {
-    console.log("Next button clicked");
     e.preventDefault();
     nextStep();
   });
 
-  // mouse interactions
-  window.addEventListener("mousemove", onMouseMove);
+  // Add tab button functionality
+  const tabButtons = document.querySelectorAll('.tab-button');
+  tabButtons.forEach(button => {
+    button.addEventListener('click', function() {
+      const tabName = this.getAttribute('data-tab');
+      switchTab(tabName);
+    });
+  });
+
+  // Add floating info panel toggle button for mobile and desktop
+  const toggleInfoBtn = document.getElementById("toggle-info-panel");
+  if (toggleInfoBtn) {
+    toggleInfoBtn.addEventListener("click", function() {
+      const panel = document.getElementById("info-panel");
+      
+      if (isMobile()) {
+        // For mobile: make the panel visible and ensure info tab is shown
+        if (panel.classList.contains('-translate-y-full')) {
+          panel.classList.add("translate-y-0");
+          panel.classList.remove("-translate-y-full");
+          switchTab('info'); // This will handle hiding the UI elements
+        } else {
+          panel.classList.remove("translate-y-0");
+          panel.classList.add("-translate-y-full");
+          
+          // Show all UI elements when panel is closed
+          const stepNavigator = document.getElementById('step-navigator');
+          const resetCameraBtn = document.getElementById('reset-camera-btn');
+          const toggleFullscreenBtn = document.getElementById('toggle-fullscreen');
+          
+          if (stepNavigator) stepNavigator.classList.remove('hidden');
+          if (toggleInfoBtn) toggleInfoBtn.classList.remove('hidden');
+          if (resetCameraBtn) resetCameraBtn.classList.remove('hidden');
+          if (toggleFullscreenBtn) toggleFullscreenBtn.classList.remove('hidden');
+        }
+      } else {
+        // For desktop: toggle the panel
+        if (panel.classList.contains('-translate-x-full')) {
+          panel.classList.add("translate-x-0");
+          panel.classList.remove("-translate-x-full");
+          switchTab('info'); // This will handle hiding the UI elements
+        } else {
+          panel.classList.remove("translate-x-0");
+          panel.classList.add("-translate-x-full");
+          
+          // Show all UI elements when panel is closed
+          const stepNavigator = document.getElementById('step-navigator');
+          const resetCameraBtn = document.getElementById('reset-camera-btn');
+          const toggleFullscreenBtn = document.getElementById('toggle-fullscreen');
+          
+          if (stepNavigator) stepNavigator.classList.remove('hidden');
+          if (toggleInfoBtn) toggleInfoBtn.classList.remove('hidden');
+          if (resetCameraBtn) resetCameraBtn.classList.remove('hidden');
+          if (toggleFullscreenBtn) toggleFullscreenBtn.classList.remove('hidden');
+        }
+      }
+    });
+  }
+  
+  // Close panel button (mobile only)
+  const closePanelBtn = document.getElementById("close-panel");
+  if (closePanelBtn) {
+    closePanelBtn.addEventListener("click", function() {
+      const panel = document.getElementById("info-panel");
+      panel.classList.add("-translate-y-full");
+      panel.classList.remove("translate-y-0");
+      
+      // Show all UI elements when panel is closed
+      const stepNavigator = document.getElementById('step-navigator');
+      const toggleInfoBtn = document.getElementById("toggle-info-panel");
+      const resetCameraBtn = document.getElementById('reset-camera-btn');
+      const toggleFullscreenBtn = document.getElementById('toggle-fullscreen');
+      
+      if (stepNavigator) stepNavigator.classList.remove('hidden');
+      if (toggleInfoBtn) toggleInfoBtn.classList.remove('hidden');
+      if (resetCameraBtn) resetCameraBtn.classList.remove('hidden');
+      if (toggleFullscreenBtn) toggleFullscreenBtn.classList.remove('hidden');
+    });
+  }
+  
+  // Add reset camera view button functionality
+  const resetCameraBtn = document.getElementById("reset-camera-btn");
+  if (resetCameraBtn) {
+    resetCameraBtn.addEventListener("click", function() {
+      resetCameraView();
+    });
+  }
+
+  // mouse interactions with appropriate handling for mobile
+  if (isMobile()) {
+    window.addEventListener("touchstart", onTouchStart, { passive: false });
+  } else {
+    window.addEventListener("mousemove", onMouseMove);
+  }
+  
   window.addEventListener("resize", onWindowResize);
-  window.addEventListener("touchstart", onTouchStart, { passive: true }); // For mobile devices
 }
 
 function createAtom(
@@ -2469,7 +2641,7 @@ function getDataKeyForStep(step) {
     case 1:
       return "nitrousAcid";
     case 2:
-      return "nitrosoniumIon";
+      return "decomposed";  // This is actually the nitrosonium ion in the code
     case 3:
       return "nitrosamine";
     case 4:
@@ -2481,18 +2653,25 @@ function getDataKeyForStep(step) {
 
 // Focus camera on the current molecule
 function focusCameraOnCurrentMolecule(step) {
-  // Define target positions for each step
-  const targetPositions = {
-    0: new THREE.Vector3(0, 0, 0),
-    1: new THREE.Vector3(0, 0, 0),
-    2: new THREE.Vector3(0, 0, 0),
-    3: new THREE.Vector3(-1, 1, 0),
-    4: new THREE.Vector3(0, 0, 0) // Center the final nitrosamine product
-  };
-
-  // Get the target position or use default
-  const targetPosition = targetPositions[step] || new THREE.Vector3(0, 0, 0);
-
+  // Get the data key for the current step
+  const dataKey = getDataKeyForStep(step);
+  
+  // Create a default target position
+  let targetPosition = new THREE.Vector3(0, 0, 0);
+  
+  // Try to get accurate position from molecule if it exists
+  if (molecules[dataKey] && molecules[dataKey].group) {
+    // Use the molecule's position if available
+    targetPosition.copy(molecules[dataKey].group.position);
+    
+    // Apply specific offset adjustments based on step
+    if (step === 3) { // Nitrosamine step needs a specific offset
+      targetPosition.add(new THREE.Vector3(-1, 1, 0));
+    }
+  } else {
+    console.warn(`Molecule group for camera focus at step ${step} (${dataKey}) not found, using default position.`);
+  }
+  
   // Animate camera to focus on target
   gsap.to(controls.target, {
     x: targetPosition.x,
@@ -2504,7 +2683,60 @@ function focusCameraOnCurrentMolecule(step) {
   });
 }
 
-// Update molecular properties panel with scientific data
+// Function to reset camera view to default position for current step
+function resetCameraView() {
+  // Get the current step's target position
+  const lookAtTarget = new THREE.Vector3(0, 0, 0);
+  const zoomDistance = isMobile() ? 18 : 15;
+  
+  // Determine which molecule to focus on based on current step - with safety checks
+  const dataKey = getDataKeyForStep(currentStep);
+  
+  // Safely access molecule groups with proper error checking
+  if (molecules[dataKey] && molecules[dataKey].group) {
+    lookAtTarget.copy(molecules[dataKey].group.position);
+  } else {
+    console.warn(`Molecule group for step ${currentStep} (${dataKey}) not found, using default position.`);
+    // Use a default position if the molecule doesn't exist
+    lookAtTarget.set(0, 0, 0);
+  }
+  
+  // Add a subtle shake animation to indicate reset
+  const originalPos = camera.position.clone();
+  
+  // Quick subtle shake
+  gsap.timeline()
+    .to(camera.position, {
+      x: originalPos.x + 0.2,
+      y: originalPos.y - 0.2,
+      duration: 0.1
+    })
+    .to(camera.position, {
+      x: originalPos.x - 0.2,
+      y: originalPos.y + 0.2,
+      duration: 0.1
+    })
+    // Then smoothly move to the target position
+    .to(controls.target, {
+      x: lookAtTarget.x,
+      y: lookAtTarget.y,
+      z: lookAtTarget.z,
+      duration: 1.0,
+      ease: "power2.inOut"
+    })
+    .to(camera.position, {
+      x: lookAtTarget.x,
+      y: lookAtTarget.y,
+      z: lookAtTarget.z + zoomDistance,
+      duration: 1.0,
+      ease: "power2.inOut"
+    }, "<");
+  
+  // Reset camera rotation and controls
+  controls.reset();
+}
+
+// Update molecular properties panel with scientific data in table format - more concise
 function updateMoleculeData(dataKey) {
   const propertiesContainer = document.getElementById("molecular-properties");
   const data = SCIENTIFIC_DATA[dataKey];
@@ -2514,10 +2746,43 @@ function updateMoleculeData(dataKey) {
     return;
   }
 
-  let html = "";
+  // Create a table for better readability
+  let html = `
+    <div class="overflow-x-auto">
+      <table class="w-full text-left border-collapse">
+        <tbody>
+  `;
 
-  // Create formatted property rows
-  for (const [key, value] of Object.entries(data)) {
+  // List of essential properties to show (in order)
+  const essentialProps = [
+    'formula',
+    'molecular_weight',
+    'role',
+    'health_concerns',
+    'properties',
+    'formation',
+    'reactivity',
+    'mechanism',
+    'carcinogenicity'
+  ];
+  
+  // Filter to include only essential properties
+  let displayedProps = [];
+  
+  // Ensure we don't display more than 4 properties to keep it concise
+  for (const prop of essentialProps) {
+    if (data[prop] && displayedProps.length < 3) {
+      displayedProps.push([prop, data[prop]]);
+    }
+  }
+  
+  // Add formula as the most important property if it exists and isn't already included
+  if (data['formula'] && !displayedProps.some(item => item[0] === 'formula')) {
+    displayedProps.unshift(['formula', data['formula']]);
+  }
+
+  // Create formatted property rows for filtered properties
+  for (const [key, value] of displayedProps) {
     const formattedKey = key
       .replace(/_/g, " ")
       .split(" ")
@@ -2525,97 +2790,272 @@ function updateMoleculeData(dataKey) {
       .join(" ");
 
     html += `
-            <div class="flex justify-between mb-2">
-                <span class="font-medium text-primary">${formattedKey}:</span>
-                <span class="text-gray-100">${value}</span>
-            </div>
-        `;
+      <tr class="border-b border-gray-700 border-opacity-50">
+        <td class="py-1.5 pr-3 font-medium text-blue-300 whitespace-nowrap">${formattedKey}</td>
+        <td class="py-1.5 text-gray-100">${value}</td>
+      </tr>
+    `;
   }
+  
+  html += `
+        </tbody>
+      </table>
+    </div>
+  `;
   
   propertiesContainer.innerHTML = html;
 }
 
-// Update scientific context information
+// Update scientific context information with concise content
 function updateScientificContext(step) {
   const contextContainer = document.getElementById("context-content");
-  let content = "";
-  
+
+  if (!contextContainer) return;
+
+  let html = "";
+
+  // Concise content for each step with improved styling
   switch (step) {
     case 0:
-      content = `
-        <h3>Clinical Context: Dietary Sodium Nitrite</h3>
-        <p>Sodium nitrite (NaNO₂) is widely used as a preservative in processed meats such as bacon, hot dogs, and ham. It prevents bacterial growth and enhances color retention.</p>
-        <p>Regulatory agencies allow sodium nitrite at levels up to 200 ppm in food products. The acceptable daily intake (ADI) established by WHO/FAO is 0-0.07 mg/kg body weight.</p>
-        <p>Epidemiological studies suggest a correlation between high processed meat consumption and increased colorectal cancer risk.</p>
+      html = `
+        <div class="bg-gray-800 bg-opacity-30 rounded-lg p-4 border border-gray-700 border-opacity-50">
+          <h4 class="text-blue-300 font-medium mb-2">About Sodium Nitrite</h4>
+          <p>Sodium nitrite (NaNO₂) is a food preservative used in processed meats to prevent bacterial growth and maintain color. When consumed, it can react in the acidic environment of the stomach to form potentially harmful compounds.</p>
+        </div>
       `;
       break;
     case 1:
-      content = `
-        <h3>Chemical Transformation in the Stomach</h3>
-        <p>When sodium nitrite enters the acidic environment of the stomach (pH 1.5-3.5), it rapidly forms nitrous acid (HNO₂).</p>
-        <p>Nitrous acid is unstable with a half-life of only minutes at gastric pH. This instability leads to further chemical reactions.</p>
-        <p>The speed of this reaction is pH-dependent and is highest in the normal acidic conditions of the stomach, especially during digestion.</p>
+      html = `
+        <div class="bg-gray-800 bg-opacity-30 rounded-lg p-4 border border-gray-700 border-opacity-50">
+          <h4 class="text-blue-300 font-medium mb-2">Nitrous Acid Formation</h4>
+          <p>In the acidic stomach environment, sodium nitrite reacts with stomach acid to form nitrous acid (HNO₂). This unstable intermediate is the first step in a chain of reactions that can lead to nitrosamine formation.</p>
+        </div>
       `;
       break;
     case 2:
-      content = `
-        <h3>Formation of Nitrosonium Ion</h3>
-        <p>Nitrous acid further decomposes to form the highly reactive nitrosonium ion (NO⁺), a powerful nitrosating agent.</p>
-        <p>This nitrosonium ion is a transient species with a half-life of less than one second in aqueous solution but can persist longer in the gastric environment.</p>
-        <p>The nitrosonium ion's reactivity with other molecules is extremely high, making it a significant intermediate in nitrosation reactions.</p>
+      html = `
+        <div class="bg-gray-800 bg-opacity-30 rounded-lg p-4 border border-gray-700 border-opacity-50">
+          <h4 class="text-blue-300 font-medium mb-2">Nitrosonium Ion</h4>
+          <p>Nitrous acid breaks down to form the highly reactive nitrosonium ion (NO⁺), a strong nitrosating agent that can react with compounds in the digestive system, particularly secondary amines from protein breakdown.</p>
+        </div>
       `;
       break;
     case 3:
-      content = `
-        <h3>Reaction with Dietary Proteins</h3>
-        <p>When nitrosonium ions encounter dietary proteins containing secondary amines (found abundantly in meat proteins), they react rapidly (within 30-90 seconds).</p>
-        <p>This reaction is particularly concerning because meat products containing sodium nitrite also supply the proteins with secondary amines required for nitrosamine formation.</p>
-        <p>The reaction between nitrosonium ions and secondary amines is favored under gastric conditions, with reaction rates increased by up to 300% in the presence of thiols also found in meat.</p>
-      `;
-      break;
-    case 4:
-      content = `
-        <h3>Nitrosamine Formation and Cancer Risk</h3>
-        <p>The reaction produces N-nitrosamines, compounds classified as probable human carcinogens (Group 2A) by the International Agency for Research on Cancer.</p>
-        <p>Nitrosamines can cause DNA alkylation and mutation, potentially initiating cancer development, particularly in the digestive tract.</p>
-        <p>Animal studies show nitrosamines induce tumors in multiple organs at doses comparable to human dietary exposure from processed meats. Epidemiological data suggests a 16-18% increased risk of colorectal cancer per 50g daily processed meat consumption.</p>
-        <p>These alkylating metabolites form DNA adducts, particularly O⁶-alkylguanine and N⁷-alkylguanine, leading to GC→AT transitions during DNA replication.</p>
+      html = `
+        <div class="bg-gray-800 bg-opacity-30 rounded-lg p-4 border border-gray-700 border-opacity-50">
+          <h4 class="text-blue-300 font-medium mb-2">Nitrosamine Formation</h4>
+          <p>When the nitrosonium ion reacts with secondary amines, it forms nitrosamines (R₂N-N=O). These compounds are classified as probable human carcinogens that can cause DNA mutations after being metabolically activated in the body.</p>
+        </div>
       `;
       break;
     default:
-      content = "Select a step to view scientific context";
-      break;
+      html = `<div class="bg-gray-800 bg-opacity-30 rounded-lg p-4 border border-gray-700 border-opacity-50"><p>No scientific context available for this step.</p></div>`;
   }
 
-  contextContainer.innerHTML = content;
+  contextContainer.innerHTML = html;
+}
+
+// Update the step indicator in the sidebar
+function updateStepIndicator(step) {
+  const stepIndicator = document.getElementById("molecule-step-indicator");
+  if (stepIndicator) {
+    // Steps are 0-indexed in code but 1-indexed for display
+    stepIndicator.textContent = `Step ${step + 1}/${totalSteps + 1}`;
+    
+    // Change color based on step
+    const colors = [
+      "bg-blue-500",   // Sodium Nitrite
+      "bg-green-500",  // Nitrous Acid
+      "bg-yellow-500", // Nitrosonium Ion
+      "bg-red-500"     // Nitrosamine
+    ];
+    
+    // Remove existing color classes
+    stepIndicator.className = stepIndicator.className.replace(/bg-\w+-\d+/g, '');
+    
+    // Add current color class
+    stepIndicator.classList.add(colors[step] || colors[0]);
+  }
+}
+
+// Update the step title in the bottom indicator
+function updateStepTitle(step) {
+  const stepTitle = document.querySelector(".step-title");
+  if (!stepTitle) return;
+  
+  let title = "";
+  switch(step) {
+    case 0:
+      title = "Initial State: Sodium Nitrite";
+      break;
+    case 1:
+      title = "Acid Reaction: Nitrous Acid Formation";
+      break;
+    case 2:
+      title = "Decomposition: Nitrosonium Ion";
+      break;
+    case 3:
+      title = "Final Product: Nitrosamine Formation";
+      break;
+    default:
+      title = "Sodium Nitrite to Nitrosamine";
+  }
+  
+  stepTitle.textContent = title;
 }
 
 // Update navigation button states based on current step
 function updateNavigationButtons(step) {
-  const prevButton = document.querySelector('#prev-button');
-  const nextButton = document.querySelector('#next-button');
-  
-  if (prevButton && nextButton) {
-    // Disable previous button on first step
-    if (step === 0) {
-      prevButton.classList.add('disabled');
-      prevButton.setAttribute('disabled', 'disabled');
-    } else {
-      prevButton.classList.remove('disabled');
-      prevButton.removeAttribute('disabled');
-    }
+  const prevButton = document.getElementById("prev-btn");
+  const nextButton = document.getElementById("next-btn");
     
-    // Disable next button on last step
-    if (step === totalSteps) {
-      nextButton.classList.add('disabled');
-      nextButton.setAttribute('disabled', 'disabled');
-    } else {
-      nextButton.classList.remove('disabled');
-      nextButton.removeAttribute('disabled');
-    }
+  // Disable previous button on first step
+  if (step === 0) {
+    prevButton.classList.add('disabled');
+    prevButton.setAttribute('disabled', 'disabled');
+  } else {
+    prevButton.classList.remove('disabled');
+    prevButton.removeAttribute('disabled');
   }
+    
+  // Disable next button on last step
+  if (step === totalSteps) {
+    nextButton.classList.add('disabled');
+    nextButton.setAttribute('disabled', 'disabled');
+  } else {
+    nextButton.classList.remove('disabled');
+    nextButton.removeAttribute('disabled');
+  }
+    
+  // Update step indicator
+  updateStepIndicator(step);
 }
 
+// Show the current step
+// Implement the real showStep function that combines both versions
+function showStepImplementation(step) {
+  // Validate step is within bounds
+  if (step < 0 || step > totalSteps) return;
+  
+  console.log('showStep called for step:', step, 'current animation flag:', animationPlaying);
+  
+  // Set animation flag
+  animationPlaying = true;
+  
+  // Add a safety timeout to prevent animations from getting stuck
+  if (window.animationResetTimeout) {
+    clearTimeout(window.animationResetTimeout);
+  }
+  
+  // Safety mechanism: if animation gets stuck, reset after 10 seconds
+  window.animationResetTimeout = setTimeout(() => {
+    console.warn('Animation reset safety triggered');
+    animationPlaying = false;
+  }, 10000);
+  
+  // Get the data keys for the previous and current steps
+  const prevDataKey = getDataKeyForStep(currentStep);
+  const newDataKey = getDataKeyForStep(step);
+  
+  // Check if this is a direct step change (e.g., via next/prev buttons)
+  // or if it's a first load (0 to 0)
+  const isDirectChange = step !== currentStep || step === 0;
+  
+  // If this is an actual step change and both molecules exist, do a transition
+  if (isDirectChange && molecules[prevDataKey] && molecules[newDataKey] && step !== currentStep) {
+    console.log(`Transitioning from ${prevDataKey} to ${newDataKey}`);
+    
+    // Hide all molecules except the ones involved in the transition
+    Object.keys(molecules).forEach(key => {
+      if (key !== prevDataKey && key !== newDataKey) {
+        molecules[key].visible = false;
+      }
+    });
+    
+    // Make the previous molecule visible for transition
+    if (molecules[prevDataKey]) {
+      molecules[prevDataKey].visible = true;
+    }
+    
+    // Set up a timeline for a smooth transition
+    const timeline = gsap.timeline({
+      onComplete: () => {
+        // Hide previous molecule when transition completes
+        if (molecules[prevDataKey]) {
+          molecules[prevDataKey].visible = false;
+        }
+        
+        // Only the new molecule should be visible
+        if (molecules[newDataKey]) {
+          molecules[newDataKey].visible = true;
+        }
+        
+        // End the animation state
+        animationPlaying = false;
+        
+        console.log('Animation complete');
+      }
+    });
+    
+    // Focus camera on the target molecule
+    focusCameraOnCurrentMolecule(step);
+    
+    // If available, run the transition between molecules
+    if (molecules[prevDataKey] && molecules[newDataKey]) {
+      timeline.add(() => {
+        // Use the existing transition function
+        console.log('Molecule transition started');
+        if (typeof transitionMolecules === 'function') {
+          transitionMolecules(molecules[prevDataKey], molecules[newDataKey]);
+        }
+      });
+    }
+  } else {
+    // Simple display without transition (first load or step doesn't change)
+    console.log(`Simple display of step ${step} (${newDataKey})`);
+    
+    // Hide all molecules
+    hideAllMolecules();
+    
+    // Show only the current molecule
+    if (molecules[newDataKey]) {
+      molecules[newDataKey].visible = true;
+    } else {
+      console.warn(`Molecule for step ${step} (${newDataKey}) not found.`);
+    }
+    
+    // Update camera position
+    focusCameraOnCurrentMolecule(step);
+    
+    // Since there's no transition, end the animation state immediately
+    animationPlaying = false;
+  }
+  
+  // Update UI elements
+  const dataKey = newDataKey;
+  
+  // Update molecular properties panel
+  updateMoleculeData(dataKey);
+  
+  // Update scientific context information
+  updateScientificContext(step);
+  
+  // Update navigation buttons
+  updateNavigationButtons(step);
+  
+  // Update the step indicator in the sidebar
+  updateStepIndicator(step);
+  
+  // Update step title in the bottom indicator
+  updateStepTitle(step);
+}
+
+function showStep(step) {
+  // This is a wrapper function that calls the main implementation
+  // This ensures any code that calls showStep will use the proper implementation
+  // that handles the transitions and animations
+  showStepImplementation(step);
+}
 
 // Go to next step
 function nextStep() {
@@ -2627,7 +3067,30 @@ function nextStep() {
   
   if (currentStep < totalSteps) {
     console.log('Moving to step:', currentStep + 1);
-    showStep(currentStep + 1);
+    currentStep++;
+    showStep(currentStep);
+    
+    // Close the sidebar on mobile after changing step
+    if (isMobile()) {
+      const infoPanel = document.getElementById("info-panel");
+      // Check for correct transform class
+      if (!infoPanel.classList.contains("-translate-y-full")) {
+        // Hide the panel
+        infoPanel.classList.add("-translate-y-full");
+        infoPanel.classList.remove("translate-y-0");
+        
+        // Show UI elements when info panel is closed
+        const stepNavigator = document.getElementById('step-navigator');
+        const toggleInfoBtn = document.getElementById("toggle-info-panel");
+        const resetCameraBtn = document.getElementById('reset-camera-btn');
+        const toggleFullscreenBtn = document.getElementById('toggle-fullscreen');
+        
+        if (stepNavigator) stepNavigator.classList.remove('hidden');
+        if (toggleInfoBtn) toggleInfoBtn.classList.remove('hidden');
+        if (resetCameraBtn) resetCameraBtn.classList.remove('hidden');
+        if (toggleFullscreenBtn) toggleFullscreenBtn.classList.remove('hidden');
+      }
+    }
   } else {
     console.log('Already at last step');
   }
@@ -2643,7 +3106,30 @@ function previousStep() {
   
   if (currentStep > 0) {
     console.log('Moving to step:', currentStep - 1);
-    showStep(currentStep - 1);
+    currentStep--;
+    showStep(currentStep);
+    
+    // Close the sidebar on mobile after changing step
+    if (isMobile()) {
+      const infoPanel = document.getElementById("info-panel");
+      // Check for correct transform class
+      if (!infoPanel.classList.contains("-translate-y-full")) {
+        // Hide the panel
+        infoPanel.classList.add("-translate-y-full");
+        infoPanel.classList.remove("translate-y-0");
+        
+        // Show UI elements when info panel is closed
+        const stepNavigator = document.getElementById('step-navigator');
+        const toggleInfoBtn = document.getElementById("toggle-info-panel");
+        const resetCameraBtn = document.getElementById('reset-camera-btn');
+        const toggleFullscreenBtn = document.getElementById('toggle-fullscreen');
+        
+        if (stepNavigator) stepNavigator.classList.remove('hidden');
+        if (toggleInfoBtn) toggleInfoBtn.classList.remove('hidden');
+        if (resetCameraBtn) resetCameraBtn.classList.remove('hidden');
+        if (toggleFullscreenBtn) toggleFullscreenBtn.classList.remove('hidden');
+      }
+    }
   } else {
     console.log('Already at first step');
   }
@@ -2657,44 +3143,170 @@ mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
 
 // Raycasting for object detection
 raycaster.setFromCamera(mouse, camera);
-  // Raycasting for object detection
-  raycaster.setFromCamera(mouse, camera);
 }
 
-// Touch event handler for mobile devices
+// Enhanced touch event handlers for mobile devices
 function onTouchStart(event) {
-  // Convert touch to mouse event for raycasting
-  if (event.touches.length > 0) {
+  // Prevent default behavior for certain elements but not controls
+  if (event.target.tagName !== "BUTTON" && !event.target.closest(".controls")) {
+    event.preventDefault(); // Prevent scrolling when interacting with the 3D canvas
+  }
+  
+  // Convert touch to mouse position for raycasting
+  if (event.touches && event.touches.length > 0) {
     const touch = event.touches[0];
-    const simulatedEvent = {
-      clientX: touch.clientX,
-      clientY: touch.clientY,
-    };
-    onMouseMove(simulatedEvent);
+    mouse.x = (touch.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(touch.clientY / window.innerHeight) * 2 + 1;
+    
+    // Cast ray to check for intersections with molecules
+    raycaster.setFromCamera(mouse, camera);
+    const intersects = raycaster.intersectObjects(scene.children, true);
+    
+    handleIntersections(intersects, touch.clientX, touch.clientY);
   }
 }
 
-// Window resize handler
-function onWindowResize() {
-  camera.aspect = window.innerWidth / window.innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  composer.setSize(window.innerWidth, window.innerHeight);
-
-  // Update FXAA resolution uniform
-  effectFXAA.uniforms.resolution.value.set(
-    1 / window.innerWidth,
-    1 / window.innerHeight
-  );
+// New touch move handler for mobile interactions
+function onTouchMove(event) {
+  // Only process if we're interacting with the 3D space
+  if (event.target.tagName !== "BUTTON" && !event.target.closest(".controls")) {
+    event.preventDefault();
+  }
+  
+  if (event.touches && event.touches.length > 0) {
+    const touch = event.touches[0];
+    mouse.x = (touch.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(touch.clientY / window.innerHeight) * 2 + 1;
+  }
 }
 
-// Performance-optimized animation loop
+// New touch end handler for mobile interactions
+function onTouchEnd(event) {
+  // Hide any tooltips or reactive UI elements
+  const tooltip = document.getElementById("molecule-tooltip");
+  if (tooltip) {
+    tooltip.style.display = "none";
+  }
+}
+
+// Common function to handle ray intersection for both mouse and touch
+function handleIntersections(intersects, clientX, clientY) {
+  const tooltip = document.getElementById("molecule-tooltip");
+  
+  // Find the first object that is part of a molecule
+  const moleculeIntersect = intersects.find(intersect => {
+    // Traverse up the object hierarchy to find a parent with molecule data
+    let current = intersect.object;
+    while (current) {
+      if (current.userData && (current.userData.moleculeType || current.userData.atomType)) {
+        return true;
+      }
+      current = current.parent;
+    }
+    return false;
+  });
+  
+  if (moleculeIntersect) {
+    // Find the topmost parent with molecule data
+    let target = moleculeIntersect.object;
+    let moleculeData = null;
+    
+    while (target) {
+      if (target.userData && (target.userData.moleculeType || target.userData.atomType)) {
+        moleculeData = target.userData;
+      }
+      target = target.parent;
+    }
+    
+    if (moleculeData) {
+      // Display tooltip with molecule information
+      tooltip.style.display = "block";
+      tooltip.style.left = (clientX + 15) + "px";
+      tooltip.style.top = clientY + "px";
+      
+      // Set tooltip content based on what was clicked
+      if (moleculeData.atomType) {
+        tooltip.innerHTML = `<strong>${moleculeData.atomType}</strong>`;
+        if (SCIENTIFIC_DATA[moleculeData.moleculeType]) {
+          tooltip.innerHTML += `<br>Part of: ${moleculeData.moleculeType}`;
+        }
+      } else if (moleculeData.moleculeType && SCIENTIFIC_DATA[moleculeData.moleculeType]) {
+        const data = SCIENTIFIC_DATA[moleculeData.moleculeType];
+        tooltip.innerHTML = `<strong>${moleculeData.moleculeType}</strong><br>${data.formula}`;
+      }
+    }
+  } else {
+    // Hide tooltip if not hovering over a molecule
+    tooltip.style.display = "none";
+  }
+}
+
+// Enhanced window resize handler for responsive design
+function onWindowResize() {
+  // Update camera aspect ratio
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  
+  // Update renderer size
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, isMobile() ? 2 : 3));
+  
+  // Update post-processing effects
+  effectFXAA.uniforms.resolution.value.set(1 / window.innerWidth, 1 / window.innerHeight);
+  composer.setSize(window.innerWidth, window.innerHeight);
+  
+  // Update camera FOV for better mobile viewing
+  if (isMobile()) {
+    // Adjust FOV based on orientation
+    if (window.innerWidth < window.innerHeight) {
+      // Portrait orientation needs wider FOV
+      camera.fov = 85;
+    } else {
+      // Landscape orientation can have normal FOV
+      camera.fov = 75;
+    }
+    camera.updateProjectionMatrix();
+    
+    // Handle info panel visibility based on screen size
+    const infoPanel = document.getElementById("info-panel");
+    if (window.innerWidth < 768 && infoPanel.classList.contains("visible")) {
+      infoPanel.classList.remove("visible");
+    }
+  }
+}
+
+// Performance-optimized animation loop with mobile considerations
 function animate() {
   requestAnimationFrame(animate);
-
+  
   // Update controls
   controls.update();
-
+  
+  // Optimize performance for mobile
+  if (isMobile()) {
+    // Use standard rendering for better performance on mobile
+    renderer.render(scene, camera);
+    
+    // Only use composer with special effects occasionally on mobile to save power
+    if (Math.random() < 0.2) { // Only 20% of frames get full post-processing on mobile
+      composer.render();
+    }
+  } else {
+    // Use full quality on desktop
+    composer.render();
+  }
+  
+  // Optimize any animated particles or effects based on device capability
+  if (transitionEffects.children.length > 0) {
+    const maxParticles = isMobile() ? 15 : 50; // Fewer particles on mobile
+    
+    // If we have too many particles for the device, randomly remove some
+    while (transitionEffects.children.length > maxParticles) {
+      const randomIndex = Math.floor(Math.random() * transitionEffects.children.length);
+      transitionEffects.remove(transitionEffects.children[randomIndex]);
+    }
+  }
+  
   // Use a time-based animation instead of frame-based for smoother motion
   const time = performance.now() * 0.001; // Convert to seconds
   

@@ -2,198 +2,190 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Sodium Nitrite to Nitrosamine</title>
-    <!-- Inline Tailwind CSS for production use, addressing the CDN warning -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     <style>
-      /* Base Tailwind utility classes */
-      .flex { display: flex; }
-      .flex-1 { flex: 1 1 0%; }
-      .flex-col { flex-direction: column; }
-      .relative { position: relative; }
-      .absolute { position: absolute; }
-      .fixed { position: fixed; }
-      .w-full { width: 100%; }
-      .h-full { height: 100%; }
-      .w-screen { width: 100vw; }
-      .h-screen { height: 100vh; }
-      .m-0 { margin: 0; }
-      .p-0 { padding: 0; }
-      .overflow-hidden { overflow: hidden; }
-      .overflow-y-auto { overflow-y: auto; }
-      .bg-bg-dark { background-color: #121212; }
-      .bg-bg-panel { background-color: #1e1e1e; }
-      .bg-primary { background-color: #2196f3; }
-      .bg-primary-dark { background-color: #0d47a1; }
-      .bg-transparent { background-color: transparent; }
-      .text-white { color: #ffffff; }
-      .text-xl { font-size: 1.25rem; line-height: 1.75rem; }
-      .font-medium { font-weight: 500; }
-      .font-sans { font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
-      .p-5 { padding: 1.25rem; }
-      .py-2\.5 { padding-top: 0.625rem; padding-bottom: 0.625rem; }
-      .px-4 { padding-left: 1rem; padding-right: 1rem; }
-      .px-5 { padding-left: 1.25rem; padding-right: 1.25rem; }
-      .mb-2 { margin-bottom: 0.5rem; }
-      .mb-5 { margin-bottom: 1.25rem; }
-      .mt-0 { margin-top: 0; }
-      .gap-2 { gap: 0.5rem; }
-      .gap-2\.5 { gap: 0.625rem; }
-      .gap-4 { gap: 1rem; }
-      .items-center { align-items: center; }
-      .justify-center { justify-content: center; }
-      .justify-between { justify-content: space-between; }
-      .rounded-lg { border-radius: 0.5rem; }
-      .rounded-full { border-radius: 9999px; }
-      .rounded-\[20px\] { border-radius: 20px; }
-      .transition-all { transition-property: all; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1); transition-duration: 150ms; }
-      .duration-200 { transition-duration: 200ms; }
-      .duration-300 { transition-duration: 300ms; }
-      .ease-in-out { transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1); }
-      .hover\:bg-primary-dark:hover { background-color: #0d47a1; }
-      .hover\:bg-\[rgba\(255\,255\,255\,0\.1\)\]:hover { background-color: rgba(255,255,255,0.1); }
-      .active\:scale-\[0\.98\]:active { transform: scale(0.98); }
-      .cursor-pointer { cursor: pointer; }
-      .border-none { border: none; }
-      .border-b { border-bottom-width: 1px; }
-      .border-\[rgba\(255\,255\,255\,0\.1\)\] { border-color: rgba(255,255,255,0.1); }
-      .shadow-lg { --tw-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); box-shadow: var(--tw-shadow); }
-      .w-\[380px\] { width: 380px; }
-      .w-\[30px\] { width: 30px; }
-      .h-\[30px\] { height: 30px; }
-      .w-16 { width: 4rem; }
-      .h-16 { height: 4rem; }
-      .border-4 { border-width: 4px; }
-      .border-\[rgba\(255\,255\,255\,0\.1\)\] { border-color: rgba(255,255,255,0.1); }
-      .border-t-primary { border-top-color: #2196f3; }
-      .tracking-wide { letter-spacing: 0.025em; }
-      .z-10 { z-index: 10; }
-      .z-50 { z-index: 50; }
-      .z-\[5\] { z-index: 5; }
-      .top-0 { top: 0; }
-      .left-0 { left: 0; }
-      .left-1\/2 { left: 50%; }
-      .bottom-\[30px\] { bottom: 30px; }
-      .transform { --tw-translate-x: 0; --tw-translate-y: 0; --tw-rotate: 0; --tw-skew-x: 0; --tw-skew-y: 0; --tw-scale-x: 1; --tw-scale-y: 1; transform: translateX(var(--tw-translate-x)) translateY(var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y)); }
-      .-translate-x-1\/2 { --tw-translate-x: -50%; }
-      .md\:translate-x-0 { --tw-translate-x: 0; }
-      .sm\:-translate-x-full { --tw-translate-x: -100%; }
-      .translate-x-0 { --tw-translate-x: 0; }
-      .hidden { display: none; }
-      .max-w-\[250px\] { max-width: 250px; }
-      .w-4\/5 { width: 80%; }
-      .max-w-\[800px\] { max-width: 800px; }
-      .text-center { text-align: center; }
-      .backdrop-blur-sm { --tw-backdrop-blur: blur(4px); backdrop-filter: var(--tw-backdrop-blur); }
-      .bg-\[rgba\(0\,0\,0\,0\.6\)\] { background-color: rgba(0,0,0,0.6); }
-      .bg-\[rgba\(0\,0\,0\,0\.8\)\] { background-color: rgba(0,0,0,0.8); }
-      .text-sm { font-size: 0.875rem; line-height: 1.25rem; }
-      .pointer-events-none { pointer-events: none; }
-      .transition-opacity { transition-property: opacity; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1); transition-duration: 150ms; }
-      .border { border-width: 1px; }
-      .border-primary { border-color: #2196f3; }
-      
-      /* Animation classes */
-      .animate-spin { animation: spin 1s linear infinite; }
-      @keyframes spin { to { transform: rotate(360deg); } }
-      
-      /* Custom styles from config */
-      .formula {
-        font-family: 'JetBrains Mono', monospace;
-        background-color: rgba(0, 0, 0, 0.3);
-        padding: 15px;
-        border-radius: 8px;
-        margin: 15px 0;
-        font-size: 1.1em;
-        border-left: 4px solid #2196f3;
-        overflow-x: auto;
-      }
-      .highlight {
-        color: #ff9800;
-        font-weight: bold;
-      }
-      /* Panel visibility controls */
-      @media (max-width: 768px) {
-        #info-panel.visible {
-          transform: translateX(0) !important;
+        :root {
+            --primary: #2196F3;
+            --primary-dark: #1976D2;
+            --primary-light: #BBDEFB;
+            --bg-dark: #121212;
+            --bg-panel: #1E1E1E;
         }
-        #info-panel:not(.visible) {
-          transform: translateX(-100%) !important;
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-dark);
+            color: white;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
         }
-      }
-          .formula {
-            font-family: 'JetBrains Mono', monospace;
-            background-color: rgba(0, 0, 0, 0.3);
-            padding: 15px;
-            border-radius: 8px;
-            margin: 15px 0;
-            font-size: 1.1em;
-            border-left: 4px solid #2196f3;
-            overflow-x: auto;
-          }
-          .highlight {
-            color: #ff9800;
-            font-weight: bold;
-          }
-          /* Panel visibility controls */
-          @media (max-width: 768px) {
-            #info-panel.visible {
-              transform: translateX(0) !important;
-            }
-            #info-panel:not(.visible) {
-              transform: translateX(-100%) !important;
-            }
-          }
-        </style>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+        
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 3px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+        
+        /* Animations */
+        @keyframes pulse {
+            0% { opacity: 0.6; }
+            50% { opacity: 1; }
+            100% { opacity: 0.6; }
+        }
+        
+        .animate-pulse-slow {
+            animation: pulse 2s infinite ease-in-out;
+        }
+
+        /* Mobile panel transitions */
+        .panel-transition {
+            transition: transform 0.3s ease-in-out;
+        }
+        
+        /* Molecule tooltip animation */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .tooltip-appear {
+            animation: fadeIn 0.2s forwards;
+        }
+        
+        /* Step indicator dots */
+        .step-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background-color: rgba(255, 255, 255, 0.3);
+            margin: 0 5px;
+            transition: all 0.3s ease;
+        }
+        
+        .step-dot.active {
+            background-color: var(--primary);
+            transform: scale(1.2);
+        }
+    </style>
 </head>
-<body class="bg-bg-dark text-white font-sans m-0 p-0 overflow-hidden h-screen w-screen">
-    <div id="loading" class="fixed top-0 left-0 w-full h-full bg-bg-dark flex flex-col justify-center items-center z-50">
-        <div class="w-16 h-16 border-4 border-[rgba(255,255,255,0.1)] rounded-full border-t-primary animate-spin mb-5"></div>
+<body class="overflow-hidden">
+    <!-- Loading screen -->
+    <div id="loading" class="fixed top-0 left-0 w-full h-full bg-gray-900 flex flex-col justify-center items-center z-50">
+        <div class="w-16 h-16 border-4 border-gray-700 rounded-full border-t-blue-500 animate-spin mb-5"></div>
         <div class="text-xl text-white tracking-wide">Loading Molecular Visualization...</div>
+        <p class="text-gray-400 mt-3 text-sm max-w-xs text-center">Preparing 3D models and reaction pathway...</p>
     </div>
 
     <div id="main-container" class="flex relative w-full h-full">
-        <div id="info-panel" class="absolute top-0 left-0 w-[380px] h-full bg-bg-panel text-white p-0 z-10 overflow-y-auto transition-transform duration-300 ease-in-out shadow-lg flex flex-col md:translate-x-0 sm:-translate-x-full">
-            <div class="p-5 bg-primary-dark flex justify-between items-center border-b border-[rgba(255,255,255,0.1)]">
-                <h1 class="text-xl m-0 p-0">Sodium Nitrite to Nitrosamine</h1>
-                <button id="toggle-panel" title="Toggle panel" class="bg-transparent border-none text-white cursor-pointer w-[30px] h-[30px] flex items-center justify-center p-0 hover:bg-[rgba(255,255,255,0.1)] rounded-full transition-transform duration-300">
-                    <i class="fas fa-chevron-left"></i>
+        <!-- Info panel -->
+        <div id="info-panel" class="fixed md:absolute top-0 left-0 w-full md:w-80 lg:w-96 h-full bg-gray-900 text-white z-10 overflow-hidden flex flex-col shadow-xl panel-transition transform -translate-y-full md:translate-y-0 md:-translate-x-full">
+            <div class="p-4 bg-blue-800 flex justify-between items-center border-b border-gray-700">
+                <h1 class="text-xl font-semibold flex items-center">
+                    <i class="fas fa-atom mr-2"></i>
+                    Sodium Nitrite to Nitrosamine
+                </h1>
+                <button id="close-panel" class="md:hidden rounded-full w-8 h-8 flex items-center justify-center hover:bg-blue-700 transition-colors">
+                    <i class="fas fa-times"></i>
                 </button>
             </div>
             
-            <div id="molecule-data" class="p-5 border-b border-[rgba(255,255,255,0.1)]">
-                <h3 class="font-medium mb-2">Current Molecule Properties</h3>
-                <div id="molecular-properties"></div>
-            </div>
-
-            <div id="scientific-context" class="p-5 border-b border-[rgba(255,255,255,0.1)]">
-                <h3 class="font-medium mb-2">Scientific Context</h3>
-                <div id="context-content"></div>
+            <!-- Tab content containers -->
+            <div class="tab-content flex-1 overflow-y-auto flex flex-col" data-tab="info">
+                <!-- Container with two distinct sections -->
+                <div class="flex flex-col flex-1">
+                    <!-- Current molecule info - fixed header -->
+                    <div class="p-4 border-b border-gray-700 bg-blue-900 bg-opacity-20 sticky top-0 z-10">
+                        <div class="flex items-center justify-between mb-2">
+                            <h3 class="font-medium text-base flex items-center">
+                                <i class="fas fa-flask mr-2 text-blue-400"></i> Current Molecule
+                            </h3>
+                            <span id="molecule-step-indicator" class="text-xs px-2 py-1 rounded-full bg-blue-500 text-white font-medium">Step 1/4</span>
+                        </div>
+                        
+                        <div id="molecular-properties" class="rounded-lg overflow-hidden bg-gray-800 bg-opacity-50 p-3 text-sm"></div>
+                    </div>
+                    
+                    <!-- Scientific context - scrollable area -->
+                    <div class="p-4 flex-1">
+                        <h3 class="font-medium text-base mb-3 flex items-center">
+                            <i class="fas fa-microscope mr-2 text-blue-400"></i> Scientific Context
+                        </h3>
+                        <div id="context-content" class="text-sm text-gray-200 space-y-4 pb-16"></div>
+                    </div>
+                </div>
             </div>
             
-            <div id="controls" class="p-5 flex flex-col gap-4">
-                <div class="flex gap-2.5 w-full">
-                    <button id="prev-btn" class="flex-1 py-2.5 px-4 bg-primary border-none rounded-lg text-white cursor-pointer font-medium transition-all duration-200 hover:bg-primary-dark active:scale-[0.98] flex items-center justify-center gap-2">
-                        <i class="fas fa-chevron-left"></i> Previous
-                    </button>
-                    <button id="next-btn" class="flex-1 py-2.5 px-4 bg-primary border-none rounded-lg text-white cursor-pointer font-medium transition-all duration-200 hover:bg-primary-dark active:scale-[0.98] flex items-center justify-center gap-2">
-                        Next <i class="fas fa-chevron-right"></i>
-                    </button>
+            <!-- Fixed bottom controls for Info tab -->
+            <div class="tab-content-footer" data-tab="info">
+                <div class="p-4 bg-gray-800 border-t border-gray-700">
+                    <div class="flex flex-col gap-3">
+                        <div class="flex gap-2">
+                            <button id="prev-btn" class="flex-1 py-2.5 px-4 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 rounded-lg text-white font-medium transition-all flex items-center justify-center gap-2">
+                                <i class="fas fa-chevron-left"></i> Previous
+                            </button>
+                            <button id="next-btn" class="flex-1 py-2.5 px-4 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 rounded-lg text-white font-medium transition-all flex items-center justify-center gap-2">
+                                Next <i class="fas fa-chevron-right"></i>
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
         
-        <div id="canvas-container" class="flex-1 w-full h-full relative"></div>
+        <!-- 3D Canvas container -->
+        <div id="canvas-container" class="w-full h-full relative">
+            <!-- Floating action buttons -->
+            <div class="fixed bottom-6 right-6 z-20 flex flex-col gap-3">
+                <button id="reset-camera-btn" class="w-12 h-12 bg-gray-800 hover:bg-gray-700 text-white rounded-full shadow-lg flex items-center justify-center transition-all hover:scale-105 active:scale-95 border border-gray-700">
+                    <i class="fas fa-camera-rotate"></i>
+                </button>
+                <button id="toggle-fullscreen" class="w-12 h-12 bg-gray-800 hover:bg-gray-700 text-white rounded-full shadow-lg flex items-center justify-center transition-all hover:scale-105 active:scale-95 border border-gray-700">
+                    <i class="fas fa-expand"></i>
+                </button>
+            </div>
+            
+            <!-- Toggle info panel button (fixed in mobile view) -->
+            <button id="toggle-info-panel" class="fixed top-6 left-6 w-12 h-12 bg-blue-600 hover:bg-blue-700 rounded-full shadow-lg flex items-center justify-center z-20 text-white border-none transition-transform hover:scale-105 active:scale-95">
+                <i class="fas fa-info"></i>
+            </button>
+        </div>
         
-        <div id="step-navigator" class="absolute bottom-[30px] left-1/2 transform -translate-x-1/2 flex flex-col items-center z-[5] w-4/5 max-w-[800px]">
-            <div class="step-title text-center bg-[rgba(0,0,0,0.6)] py-2.5 px-5 rounded-[20px] font-medium backdrop-blur-sm">Initial State: Sodium Nitrite</div>
+        <!-- Bottom step title -->
+        <div id="step-navigator" class="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-10 w-4/5 max-w-lg pointer-events-none">
+            <div class="step-title text-center bg-black bg-opacity-60 backdrop-blur-sm py-3 px-5 rounded-2xl font-medium shadow-lg border border-gray-800">
+                Initial State: Sodium Nitrite
+            </div>
         </div>
     </div>
 
-    <!-- Advanced tooltips appear when hovering over molecules -->
-    <div id="molecule-tooltip" class="hidden absolute bg-[rgba(0,0,0,0.8)] text-white py-2.5 px-4 rounded-lg text-sm z-50 pointer-events-none transition-opacity duration-200 max-w-[250px] backdrop-blur-sm border border-primary"></div>
+    <!-- Advanced tooltips -->
+    <div id="molecule-tooltip" class="hidden fixed bg-black bg-opacity-80 text-white p-3 rounded-lg text-sm z-50 pointer-events-none max-w-xs backdrop-blur-sm border border-blue-500 shadow-lg">
+        <div class="flex items-center justify-between mb-1.5">
+            <span id="tooltip-title" class="font-semibold"></span>
+            <span id="tooltip-symbol" class="text-blue-400"></span>
+        </div>
+        <div id="tooltip-description" class="text-gray-300"></div>
+    </div>
 
     <!-- Scripts -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r132/three.min.js"></script>
@@ -211,7 +203,7 @@
     <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/postprocessing/UnrealBloomPass.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/postprocessing/ShaderPass.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/postprocessing/FilmPass.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/gsap@3.10.4/dist/gsap.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.2/dist/gsap.min.js"></script>
     <script src="static/script.js"></script>
 </body>
 </html>
