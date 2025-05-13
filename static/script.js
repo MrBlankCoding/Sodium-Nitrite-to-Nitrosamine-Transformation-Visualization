@@ -135,18 +135,29 @@ function createParticleSystem(origin, color, count = 20, spread = 3, size = 0.1)
 }
 
 function createGlowEffect(object, color, intensity = 1.0) {
-  // Add a subtle glow to objects during transitions
+  // This function is simplified to avoid material compatibility issues
+  // It just temporarily changes the color of any material, regardless of type
   if (object.material) {
     if (Array.isArray(object.material)) {
       object.material.forEach(mat => {
-        if (mat.emissive) {
-          mat.emissive = new THREE.Color(color);
-          mat.emissiveIntensity = intensity;
+        if (mat.color) {
+          // Store original color if not already saved
+          if (!mat.userData) mat.userData = {};
+          if (!mat.userData.originalColor) mat.userData.originalColor = mat.color.clone();
+          
+          // Temporarily change to highlight color
+          mat.color.set(color);
         }
       });
-    } else if (object.material.emissive) {
-      object.material.emissive = new THREE.Color(color);
-      object.material.emissiveIntensity = intensity;
+    } else {
+      if (object.material.color) {
+        // Store original color if not already saved
+        if (!object.material.userData) object.material.userData = {};
+        if (!object.material.userData.originalColor) object.material.userData.originalColor = object.material.color.clone();
+        
+        // Temporarily change to highlight color
+        object.material.color.set(color);
+      }
     }
   }
   
@@ -203,12 +214,11 @@ function transitionMolecules(fromMolecule, toMolecule, duration = 1.5, includePa
   toMolecule.position.copy(fromPosition);
   toMolecule.visible = false;
   
-  // Add glow effect to source molecule
-  fromMolecule.children.forEach(child => {
-    if (child.userData && child.userData.atomType) {
-      createGlowEffect(child, atomColors[child.userData.atomType] || 0xffffff, 0.4);
-    }
-  });
+  // Ensure stomach is visible during the entire transition
+  if (molecules.stomach) {
+    molecules.stomach.visible = true;
+    molecules.stomach.group.visible = true;
+  }
   
   // Fade out source molecule
   fromMolecule.traverse(object => {
@@ -419,7 +429,21 @@ function init() {
   addEventListeners();
   animate();
   
-  // Set up initial panel state
+  // Set up initial panel state and add desktop styles immediately
+  const style = document.createElement('style');
+  style.textContent = `
+    @media (min-width: 768px) {
+      #info-panel {
+        transform: translateX(0) !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        left: 0 !important;
+        display: block !important;
+      }
+    }
+  `;
+  document.head.appendChild(style);
+  
   setTimeout(() => {
     const infoPanel = document.getElementById('info-panel');
     
@@ -427,6 +451,15 @@ function init() {
       // On desktop, show the panel by default
       infoPanel.classList.remove('-translate-x-full');
       infoPanel.classList.add('translate-x-0');
+      infoPanel.classList.add('visible');
+      
+      // Add a CSS class to ensure it's always visible on desktop
+      document.body.classList.add('desktop-mode');
+      
+      // Add an inline style to force visibility
+      infoPanel.style.transform = 'translateX(0)';
+      infoPanel.style.visibility = 'visible';
+      infoPanel.style.opacity = '1';
     }
   }, 500); // Short delay to ensure DOM is fully loaded
 }
@@ -1119,9 +1152,24 @@ function addChargeIndicator(atom, chargeSymbol) {
 }
 
 function createMolecules() {
+  console.log('Creating molecules...');
+  // Create molecule containers to ensure proper structure
+  molecules.sodiumNitrite = { group: new THREE.Group(), visible: true };
+  molecules.nitrousAcid = { group: new THREE.Group(), visible: false };
+  molecules.decomposed = { group: new THREE.Group(), visible: false };
+  molecules.nitrosamine = { group: new THREE.Group(), visible: false };
+  
+  // Add all molecule groups to the scene
+  scene.add(molecules.sodiumNitrite.group);
+  scene.add(molecules.nitrousAcid.group);
+  scene.add(molecules.decomposed.group);
+  scene.add(molecules.nitrosamine.group);
+  
   // Create stomach environment with physiologically accurate pH gradient visualization
-  molecules.stomach = new THREE.Group();
-  molecules.stomach.name = "stomach";
+  molecules.stomach = { group: new THREE.Group(), visible: true };
+  molecules.stomach.group.name = "stomach";
+  // Add stomach to scene immediately
+  scene.add(molecules.stomach.group);
 
   // Increase stomach size for better spacing and focus on nitrite
   const stomachShapeGeometry = new THREE.SphereGeometry(40, 64, 48);
@@ -1143,7 +1191,7 @@ function createMolecules() {
   stomachMesh.receiveShadow = true;
 
   // Add mesh to stomach group
-  molecules.stomach.add(stomachMesh);
+  molecules.stomach.group.add(stomachMesh);
   
   // Add realistic stomach molecules (gastric acid components and digestive substances)
   
@@ -1188,7 +1236,7 @@ function createMolecules() {
     waterGroup.rotation.y = Math.random() * Math.PI * 2;
     waterGroup.rotation.z = Math.random() * Math.PI * 2;
     
-    molecules.stomach.add(waterGroup);
+    molecules.stomach.group.add(waterGroup);
   }
   
   // 2. Add bicarbonate ions (HCO3-) that help protect stomach lining
@@ -1242,7 +1290,7 @@ function createMolecules() {
     bicarb.rotation.y = Math.random() * Math.PI * 2;
     bicarb.rotation.z = Math.random() * Math.PI * 2;
     
-    molecules.stomach.add(bicarb);
+    molecules.stomach.group.add(bicarb);
   }
   
   // 4. Add potassium ions (K+) important in gastric fluid
@@ -1256,18 +1304,21 @@ function createMolecules() {
     const z = radius * Math.cos(phi);
     
     const k = createAtom("K", new THREE.Vector3(x, y, z), false, "potassium", i);
-    molecules.stomach.add(k);
+    molecules.stomach.group.add(k);
   }
   
   // Add the stomach to the scene
-  scene.add(molecules.stomach);
+  // Already added to the scene above
 
   // Initially hide the stomach - it will be shown at the appropriate step
   molecules.stomach.visible = false;
+  molecules.stomach.group.visible = false;
 
   // create initial sodium nitrite with enhanced visual importance
-  molecules.sodiumNitrite = new THREE.Group();
-  molecules.sodiumNitrite.name = "sodiumNitrite";
+  // Use the group property already created at the beginning of the function
+  // Don't overwrite the entire object structure
+  molecules.sodiumNitrite.group = new THREE.Group();
+  molecules.sodiumNitrite.group.name = "sodiumNitrite";
 
   // More accurate geometry for nitrite ion based on molecular modeling data
   // N-O bond length ~1.24Å, O-N-O angle ~115°
@@ -1308,10 +1359,8 @@ function createMolecules() {
   o2.children[0].material.emissive = new THREE.Color(0x330000);
   o2.children[0].material.emissiveIntensity = 0.15;
 
-  molecules.sodiumNitrite.add(na);
-  molecules.sodiumNitrite.add(n);
-  molecules.sodiumNitrite.add(o1);
-  molecules.sodiumNitrite.add(o2);
+  // These atoms have already been added to the group in the updated code below
+  // Removing these redundant lines to avoid duplication
 
   // add ionic bond between Na and nitrite group (dashed bond to represent ionic nature)
   const naToBond = createBond(
@@ -1344,16 +1393,22 @@ function createMolecules() {
     2
   );
 
-  molecules.sodiumNitrite.add(naToBond);
-  molecules.sodiumNitrite.add(nToO1Bond);
-  molecules.sodiumNitrite.add(nToO2Bond);
+  molecules.sodiumNitrite.group.add(na);
+  molecules.sodiumNitrite.group.add(n);
+  molecules.sodiumNitrite.group.add(o1);
+  molecules.sodiumNitrite.group.add(o2);
+  molecules.sodiumNitrite.group.add(naToBond);
+  molecules.sodiumNitrite.group.add(nToO1Bond);
+  molecules.sodiumNitrite.group.add(nToO2Bond);
 
-  scene.add(molecules.sodiumNitrite);
-  molecules.sodiumNitrite.visible = false;
+  // Make sure we're using the group structure consistently
+  scene.add(molecules.sodiumNitrite.group);
+  molecules.sodiumNitrite.group.visible = true;
 
   // create nitrous acid (HNO₂)
-  molecules.nitrousAcid = new THREE.Group();
-  molecules.nitrousAcid.name = "nitrousAcid";
+  // Use the group property already created at the beginning of the function
+  molecules.nitrousAcid.group = new THREE.Group();
+  molecules.nitrousAcid.group.name = "nitrousAcid";
 
   // Increased spacing for better focus on nitrite/nitrous acid
   const naPos2 = new THREE.Vector3(-7, 0, 0);
@@ -1368,11 +1423,11 @@ function createMolecules() {
   const o4 = createAtom("O", o2Pos2, true, "nitrousAcid", 3);
   const h = createAtom("H", hPos, true, "nitrousAcid", 4);
 
-  molecules.nitrousAcid.add(na2);
-  molecules.nitrousAcid.add(n2);
-  molecules.nitrousAcid.add(o3);
-  molecules.nitrousAcid.add(o4);
-  molecules.nitrousAcid.add(h);
+  molecules.nitrousAcid.group.add(na2);
+  molecules.nitrousAcid.group.add(n2);
+  molecules.nitrousAcid.group.add(o3);
+  molecules.nitrousAcid.group.add(o4);
+  molecules.nitrousAcid.group.add(h);
 
   // add bonds with appropriate types
   const nToO1Bond2 = createBond(
@@ -1403,16 +1458,17 @@ function createMolecules() {
     2
   );
 
-  molecules.nitrousAcid.add(nToO1Bond2);
-  molecules.nitrousAcid.add(nToO2Bond2);
-  molecules.nitrousAcid.add(oToHBond);
+  molecules.nitrousAcid.group.add(nToO1Bond2);
+  molecules.nitrousAcid.group.add(nToO2Bond2);
+  molecules.nitrousAcid.group.add(oToHBond);
 
-  scene.add(molecules.nitrousAcid);
-  molecules.nitrousAcid.visible = false;
+  scene.add(molecules.nitrousAcid.group);
+  molecules.nitrousAcid.group.visible = false;
 
   // create nitrosonium ion (NO⁺) and OH⁻
-  molecules.decomposed = new THREE.Group();
-  molecules.decomposed.name = "decomposed";
+  // Use the group property already created at the beginning of the function
+  molecules.decomposed.group = new THREE.Group();
+  molecules.decomposed.group.name = "decomposed";
 
   // Increased spacing for better visibility of key components
   const nPos3 = new THREE.Vector3(-1.5, 0, 0);
@@ -1425,10 +1481,10 @@ function createMolecules() {
   const o6 = createAtom("O", oHPos, true, "decomposed", 2);
   const h2 = createAtom("H", hPos2, true, "decomposed", 3);
 
-  molecules.decomposed.add(n3);
-  molecules.decomposed.add(o5);
-  molecules.decomposed.add(o6);
-  molecules.decomposed.add(h2);
+  molecules.decomposed.group.add(n3);
+  molecules.decomposed.group.add(o5);
+  molecules.decomposed.group.add(o6);
+  molecules.decomposed.group.add(h2);
 
   // add bonds with triple bond for nitrosonium ion to show the stronger bond
   const nToOBond = createBond(
@@ -1450,19 +1506,20 @@ function createMolecules() {
     1
   );
 
-  molecules.decomposed.add(nToOBond);
-  molecules.decomposed.add(oToHBond2);
+  molecules.decomposed.group.add(nToOBond);
+  molecules.decomposed.group.add(oToHBond2);
 
   // add charge indicators
   addChargeIndicator(n3, "+");
   addChargeIndicator(o6, "-");
 
-  scene.add(molecules.decomposed);
-  molecules.decomposed.visible = false;
+  scene.add(molecules.decomposed.group);
+  molecules.decomposed.group.visible = false;
 
   // create nitrosamine
-  molecules.nitrosamine = new THREE.Group();
-  molecules.nitrosamine.name = "nitrosamine";
+  // Use the group property already created at the beginning of the function
+  molecules.nitrosamine.group = new THREE.Group();
+  molecules.nitrosamine.group.name = "nitrosamine";
 
   // positions for the protein part - increased spacing
   const c1Pos = new THREE.Vector3(-4.5, 0, 0);
@@ -1479,11 +1536,11 @@ function createMolecules() {
   const nNitro = createAtom("N", nNitroPos, true, "nitrosamine", 3);
   const oNitro = createAtom("O", oNitroPos, true, "nitrosamine", 4);
 
-  molecules.nitrosamine.add(c1);
-  molecules.nitrosamine.add(c2);
-  molecules.nitrosamine.add(nAmin);
-  molecules.nitrosamine.add(nNitro);
-  molecules.nitrosamine.add(oNitro);
+  molecules.nitrosamine.group.add(c1);
+  molecules.nitrosamine.group.add(c2);
+  molecules.nitrosamine.group.add(nAmin);
+  molecules.nitrosamine.group.add(nNitro);
+  molecules.nitrosamine.group.add(oNitro);
 
   // add bonds with appropriate types
   const c1ToNBond = createBond(
@@ -1523,17 +1580,17 @@ function createMolecules() {
     3
   );
 
-  molecules.nitrosamine.add(c1ToNBond);
-  molecules.nitrosamine.add(c2ToNBond);
-  molecules.nitrosamine.add(nToNBond);
-  molecules.nitrosamine.add(nToOBond2);
+  molecules.nitrosamine.group.add(c1ToNBond);
+  molecules.nitrosamine.group.add(c2ToNBond);
+  molecules.nitrosamine.group.add(nToNBond);
+  molecules.nitrosamine.group.add(nToOBond2);
 
-  scene.add(molecules.nitrosamine);
-  molecules.nitrosamine.visible = false;
+  scene.add(molecules.nitrosamine.group);
+  molecules.nitrosamine.group.visible = false;
 
   // create realistic protein environment (representing meat proteins in digestive tract)
-  molecules.protein = new THREE.Group();
-  molecules.protein.name = "protein";
+  molecules.protein = { group: new THREE.Group(), visible: false };
+  molecules.protein.group.name = "protein";
   
   // Create a more realistic protein structure resembling myoglobin/hemoglobin (common meat proteins)
   // Alpha helices and beta sheets represented in a globular protein fold
@@ -1570,7 +1627,7 @@ function createMolecules() {
     }
     
     const atom = createAtom(atomType, aminoAcids[i], labelShown, "protein", i);
-    molecules.protein.add(atom);
+    molecules.protein.group.add(atom);
     
     // Connect amino acids with bonds
     if (i > 0) {
@@ -1585,7 +1642,7 @@ function createMolecules() {
         i % 5 === 0 ? "N" : "C",
         (i-1) % 5 === 0 ? "N" : "C"
       );
-      molecules.protein.add(bond);
+      molecules.protein.group.add(bond);
     }
   }
   
@@ -1619,7 +1676,7 @@ function createMolecules() {
       }
       
       const atom = createAtom(atomType, position, labelShown, "protein", totalAminoAcids + strand * betaStrandLength + i);
-      molecules.protein.add(atom);
+      molecules.protein.group.add(atom);
       strandAtoms.push({
         position: position,
         type: atomType
@@ -1636,19 +1693,20 @@ function createMolecules() {
           prevAtom.type,
           atomType
         );
-        molecules.protein.add(bond);
+        molecules.protein.group.add(bond);
       }
     }
   }
   
   // Position the protein appropriately
-  molecules.protein.position.set(-8, 0, 2);
+  molecules.protein.group.position.set(-8, 0, 2);
   
   // Add the protein structure to the scene
-  scene.add(molecules.protein);
+  scene.add(molecules.protein.group);
   
   // Initially hide it - it will be shown at the appropriate step
   molecules.protein.visible = false;
+  molecules.protein.group.visible = false;
   
   // Function to create hydrogen ions
   function createHydrogenIons(count) {
@@ -1683,7 +1741,7 @@ function createMolecules() {
       hIon.children[0].material.transparent = true;
       hIon.children[0].material.opacity = 0.8;
       
-      molecules.stomach.add(hIon);
+      molecules.stomach.group.add(hIon);
       hIons.push(hIon);
     }
     
@@ -1766,7 +1824,7 @@ function createHClMolecules(count) {
           Math.random() * Math.PI * 2
         );
         
-        molecules.stomach.add(hcl);
+        molecules.stomach.group.add(hcl);
         occupiedPositions.push(position.clone());
         positioned++;
         placedInZone++;
@@ -1855,40 +1913,51 @@ hideAllMolecules();
 switch(step) {
   case 0:
     molecules.sodiumNitrite.visible = true;
+    molecules.sodiumNitrite.group.visible = true;
     break;
   case 1:
     molecules.stomach.visible = true;
+    molecules.stomach.group.visible = true;
     // For step 1, we start with sodiumNitrite and animate to nitrousAcid
     // nitrousAcid will be shown during the transition, not at the start
     if (currentStep === 0) {
       molecules.sodiumNitrite.visible = true;
+    molecules.sodiumNitrite.group.visible = true;
     } else {
       molecules.nitrousAcid.visible = true;
+      molecules.nitrousAcid.group.visible = true;
     }
     break;
   case 2:
     molecules.stomach.visible = true;
+    molecules.stomach.group.visible = true;
     // For step 2, we start with nitrousAcid and animate to decomposed
     // decomposed will be shown during the transition, not at the start
     if (currentStep === 1) {
       molecules.nitrousAcid.visible = true;
+      molecules.nitrousAcid.group.visible = true;
     } else {
       molecules.decomposed.visible = true;
+      molecules.decomposed.group.visible = true;
     }
     break;
   case 3:
     molecules.stomach.visible = true;
+    molecules.stomach.group.visible = true;
     // For step 3, we start with decomposed and animate to nitrosamine
     // protein and nitrosamine will be shown during the transition
     if (currentStep === 2) {
       molecules.decomposed.visible = true;
+      molecules.decomposed.group.visible = true;
     } else {
       // Only show the protein when it's actually needed
       // This helps avoid visual clutter
       if (step === 3) {
         molecules.protein.visible = true;
+        molecules.protein.group.visible = true;
       }
       molecules.nitrosamine.visible = true;
+      molecules.nitrosamine.group.visible = true;
     }
     break;
 }
@@ -1933,7 +2002,9 @@ const masterTimeline = gsap.timeline({
     if (currentStep === 0 && step === 1) {
       // Transition: Sodium nitrite entering stomach acid with realistic dissociation
       molecules.stomach.visible = true;
+    molecules.stomach.group.visible = true;
       molecules.sodiumNitrite.visible = true;
+    molecules.sodiumNitrite.group.visible = true;
       
       // Create stomach acid particles for a more immersive environment
       const acidParticles = createParticleSystem(
@@ -2110,7 +2181,9 @@ const masterTimeline = gsap.timeline({
     else if (currentStep === 1 && step === 2) {
       // Transition: Nitrous acid decomposing to nitrosonium ion
       molecules.stomach.visible = true;
+    molecules.stomach.group.visible = true;
       molecules.nitrousAcid.visible = true;
+      molecules.nitrousAcid.group.visible = true;
       
       // Add ripple effect for acidic environment
       const acidRipples = createParticleSystem(
@@ -2224,7 +2297,9 @@ const masterTimeline = gsap.timeline({
     else if (currentStep === 2 && step === 3) {
       // Transition: Nitrosonium ion approaching protein with secondary amines
       molecules.stomach.visible = true;
+    molecules.stomach.group.visible = true;
       molecules.decomposed.visible = true;
+      molecules.decomposed.group.visible = true;
       
       // Add protein environment particles
       const proteinEnvironment = createParticleSystem(
@@ -2414,6 +2489,7 @@ const masterTimeline = gsap.timeline({
         
         // Show only sodium nitrite
         molecules.sodiumNitrite.visible = true;
+    molecules.sodiumNitrite.group.visible = true;
         
         // Reset material opacity
         Object.keys(molecules).forEach(key => {
@@ -2462,6 +2538,7 @@ const masterTimeline = gsap.timeline({
       masterTimeline.add(() => {
         if (step === 0) {
           molecules.sodiumNitrite.visible = true;
+    molecules.sodiumNitrite.group.visible = true;
           molecules.sodiumNitrite.traverse(object => {
             if (object.material) {
               object.material.transparent = true;
@@ -2470,7 +2547,9 @@ const masterTimeline = gsap.timeline({
           });
         } else if (step === 1) {
           molecules.stomach.visible = true;
+    molecules.stomach.group.visible = true;
           molecules.nitrousAcid.visible = true;
+      molecules.nitrousAcid.group.visible = true;
           [molecules.stomach, molecules.nitrousAcid].forEach(molecule => {
             molecule.traverse(object => {
               if (object.material) {
@@ -2481,7 +2560,9 @@ const masterTimeline = gsap.timeline({
           });
         } else if (step === 2) {
           molecules.stomach.visible = true;
+    molecules.stomach.group.visible = true;
           molecules.decomposed.visible = true;
+      molecules.decomposed.group.visible = true;
           [molecules.stomach, molecules.decomposed].forEach(molecule => {
             molecule.traverse(object => {
               if (object.material) {
@@ -2492,8 +2573,11 @@ const masterTimeline = gsap.timeline({
           });
         } else if (step === 3) {
           molecules.stomach.visible = true;
+    molecules.stomach.group.visible = true;
           molecules.protein.visible = true;
+        molecules.protein.group.visible = true;
           molecules.nitrosamine.visible = true;
+      molecules.nitrosamine.group.visible = true;
           [molecules.stomach, molecules.protein, molecules.nitrosamine].forEach(molecule => {
             molecule.traverse(object => {
               if (object.material) {
@@ -2528,20 +2612,30 @@ const masterTimeline = gsap.timeline({
   else {
     // If we're just showing the same step again, do a simple reset
     const stepConfig = {
-      0: () => { molecules.sodiumNitrite.visible = true; },
+      0: () => { 
+          molecules.sodiumNitrite.visible = true;
+          molecules.sodiumNitrite.group.visible = true; 
+        },
       1: () => {
         molecules.stomach.visible = true;
+    molecules.stomach.group.visible = true;
         molecules.nitrousAcid.visible = true;
+      molecules.nitrousAcid.group.visible = true;
       },
       2: () => {
         molecules.stomach.visible = true;
+    molecules.stomach.group.visible = true;
         molecules.decomposed.visible = true;
+      molecules.decomposed.group.visible = true;
       },
       3: () => {
         molecules.stomach.visible = true;
+    molecules.stomach.group.visible = true;
         // Don't show the large clump of atoms (protein) as it's visually confusing
-        // molecules.protein.visible = true; 
+        // molecules.protein.visible = true;
+        // molecules.protein.group.visible = true; 
         molecules.nitrosamine.visible = true;
+      molecules.nitrosamine.group.visible = true;
       }
     };
     
@@ -2931,8 +3025,7 @@ function updateNavigationButtons(step) {
   updateStepIndicator(step);
 }
 
-// Show the current step
-// Implement the real showStep function that combines both versions
+// Show the current step with enhanced animation transitions
 function showStepImplementation(step) {
   // Validate step is within bounds
   if (step < 0 || step > totalSteps) return;
@@ -2942,6 +3035,39 @@ function showStepImplementation(step) {
   // Set animation flag
   animationPlaying = true;
   
+  // Get previous and current data keys for the transition
+  const prevDataKey = getDataKeyForStep(currentStep);
+  const newDataKey = getDataKeyForStep(step);
+  
+  console.log(`Transitioning from ${prevDataKey} to ${newDataKey}`);
+  
+  // Ensure proper molecule objects structure
+  const moleculeKeys = ['sodiumNitrite', 'nitrousAcid', 'decomposed', 'nitrosamine'];
+  moleculeKeys.forEach(key => {
+    if (!molecules[key]) {
+      molecules[key] = { 
+        group: new THREE.Group(), 
+        visible: false 
+      };
+      molecules[key].group.name = key;
+      scene.add(molecules[key].group);
+    } else if (!molecules[key].group) {
+      molecules[key].group = new THREE.Group();
+      molecules[key].group.name = key;
+      scene.add(molecules[key].group);
+    }
+  });
+  
+  // Make sure stomach environment is visible for all steps
+  if (molecules.stomach) {
+    molecules.stomach.visible = true;
+    molecules.stomach.group.visible = true;
+  } else {
+    console.warn('Stomach environment not found!');
+    // Try to recreate it if missing
+    createStomachEnvironment();
+  }
+  
   // Add a safety timeout to prevent animations from getting stuck
   if (window.animationResetTimeout) {
     clearTimeout(window.animationResetTimeout);
@@ -2949,67 +3075,851 @@ function showStepImplementation(step) {
   
   // Safety mechanism: if animation gets stuck, reset after 10 seconds
   window.animationResetTimeout = setTimeout(() => {
-    console.warn('Animation reset safety triggered');
+    console.log('Animation safety timeout triggered after 10 seconds');
+    animationPlaying = false;
+  }, 10000);
+  
+  // Update UI elements
+  updateStepTitle(step);
+  updateStepIndicator(step);
+  updateNavigationButtons(step);
+  
+  // Create a GSAP timeline for all animations
+  const masterTimeline = gsap.timeline({
+    onComplete: () => {
+      console.log('Animation complete, setting animationPlaying to false');
+      // Hide previous molecule
+      if (molecules[prevDataKey] && molecules[prevDataKey].group) {
+        molecules[prevDataKey].group.visible = false;
+      }
+      // Make sure new molecule is visible
+      if (molecules[newDataKey] && molecules[newDataKey].group) {
+        molecules[newDataKey].group.visible = true;
+      }
+      // Update the data panels after animation completes
+      updateMoleculeData(newDataKey);
+      updateScientificContext(step);
+      // Animation is done
+      animationPlaying = false;
+      // Update current step
+      currentStep = step;
+      // Clear the safety timeout since animation completed properly
+      if (window.animationResetTimeout) {
+        clearTimeout(window.animationResetTimeout);
+      }
+    }
+  });
+  
+  // Handle transition effects between molecules
+  if (prevDataKey !== newDataKey) {
+    console.log(`Animating transition from ${prevDataKey} to ${newDataKey}`);
+    
+    // Simple transition directly from one molecule to another
+    if (molecules[prevDataKey] && molecules[prevDataKey].group && 
+        molecules[newDataKey] && molecules[newDataKey].group) {
+      
+      // STEP 1: Setup - Make sure source is visible and target is hidden
+      molecules[prevDataKey].group.visible = true;
+      molecules[newDataKey].group.visible = false;
+      
+      // Reset opacity on all materials
+      molecules[prevDataKey].group.traverse(object => {
+        if (object.material) {
+          object.material.transparent = true;
+          object.material.opacity = 1.0;
+        }
+      });
+      
+      // STEP 2: Create particles for visual effect if needed
+      const particleColor = step === 1 ? 0xFFFFFF : // white for acid
+                            step === 2 ? 0xFFA726 : // orange for decomposition
+                            step === 3 ? 0xFF5252 : // red for nitrosamine 
+                            0xFFFFFF;  // default
+      
+      const particles = new THREE.Points(
+        new THREE.BufferGeometry().setFromPoints(
+          Array(20).fill().map(() => new THREE.Vector3(
+            (Math.random() - 0.5) * 5,
+            (Math.random() - 0.5) * 5,
+            (Math.random() - 0.5) * 5
+          ))
+        ),
+        new THREE.PointsMaterial({
+          color: particleColor,
+          size: 0.2,
+          transparent: true,
+          opacity: 0.7
+        })
+      );
+      
+      particles.position.copy(molecules[prevDataKey].group.position);
+      scene.add(particles);
+      
+      // STEP 3: Define the animation timeline
+      // Create a very simple timeline
+      masterTimeline.add(() => {
+        // Fade out the source molecule
+        gsap.to(molecules[prevDataKey].group.children, {
+          opacity: 0,
+          duration: 0.8,
+          stagger: 0.02,
+          ease: 'power2.in',
+          onComplete: () => {
+            // After fade out, hide source and show target
+            molecules[prevDataKey].group.visible = false;
+            molecules[newDataKey].group.visible = true;
+            
+            // Animate particles
+            gsap.to(particles.material, {
+              opacity: 0,
+              duration: 0.5,
+              delay: 0.8,
+              onComplete: () => {
+                scene.remove(particles);
+              }
+            });
+            
+            // Fade in target molecule
+            molecules[newDataKey].group.children.forEach(child => {
+              if (child.material) {
+                child.material.transparent = true;
+                child.material.opacity = 0;
+              }
+            });
+            
+            gsap.to(molecules[newDataKey].group.children, {
+              opacity: 1,
+              duration: 0.8,
+              stagger: 0.03,
+              ease: 'power2.out'
+            });
+          }
+        });
+      });
+      }
+      else if (step === 2 && currentStep === 1) { // Nitrous Acid to Nitrosonium Ion
+        console.log('Animating: Nitrous Acid decomposing to form Nitrosonium Ion');
+        
+        // Make sure source and target molecules are properly prepared
+        molecules[prevDataKey].group.visible = true;
+        molecules[newDataKey].group.visible = false;
+        
+        // Create decomposition particles
+        const decompParticles = createParticleSystem(
+          molecules[prevDataKey].group.position, 
+          atomColors.NitriteHighlight, // Yellow-orange for decomposition
+          20, // particle count
+          4,  // spread
+          0.2 // size
+        );
+        transitionParticles.add(decompParticles);
+        
+        // Create water molecules that split off
+        const waterParticle = createParticleSystem(
+          molecules[prevDataKey].group.position, 
+          atomColors.O, // Oxygen color for water
+          5, // particle count
+          3, // spread
+          0.3 // size
+        );
+        transitionParticles.add(waterParticle);
+        
+        // Animate particles moving outward
+        waterParticle.children.forEach(particle => {
+          const randomAngle = Math.random() * Math.PI * 2;
+          const randomDistance = 3 + Math.random() * 3;
+          masterTimeline.to(particle.position, {
+            x: particle.position.x + Math.cos(randomAngle) * randomDistance,
+            y: particle.position.y + Math.sin(randomAngle) * randomDistance,
+            z: particle.position.z + (Math.random() - 0.5) * randomDistance,
+            duration: 1.2,
+            ease: 'power2.out'
+          }, 0.3);
+        });
+        
+        // Create a simpler fade transition
+        // Fade out source molecule
+        molecules[prevDataKey].group.traverse(object => {
+          if (object.material) {
+            if (object.material.transparent === undefined) {
+              object.material.transparent = true;
+            }
+            masterTimeline.to(object.material, {
+              opacity: 0,
+              duration: 1.0,
+              ease: 'power2.inOut'
+            }, 0.5);
+          }
+        });
+        
+        // After source fades, show target
+        masterTimeline.call(() => {
+          molecules[prevDataKey].group.visible = false;
+          molecules[newDataKey].group.visible = true;
+          // Reset opacity on source for future use
+          molecules[prevDataKey].group.traverse(object => {
+            if (object.material) {
+              object.material.opacity = 1;
+            }
+          });
+        }, null, 1.5);
+        
+        // Fade in the target molecule
+        molecules[newDataKey].group.traverse(object => {
+          if (object.material) {
+            object.material.transparent = true;
+            object.material.opacity = 0;
+            masterTimeline.to(object.material, {
+              opacity: 1,
+              duration: 0.8,
+              ease: 'power2.inOut'
+            }, 1.6);
+          }
+        });
+      }
+      else if (step === 3 && currentStep === 2) { // Nitrosonium Ion to Nitrosamine
+        console.log('Animating: Nitrosonium Ion combining with amine to form Nitrosamine');
+        
+        // Make sure source and target molecules are properly prepared
+        molecules[prevDataKey].group.visible = true;
+        molecules[newDataKey].group.visible = false;
+        
+        // Create amine particles that will combine with the nitrosonium ion
+        const amineParticles = createParticleSystem(
+          new THREE.Vector3(5, 0, 0), // Approach from right side
+          atomColors.N, // Nitrogen color for amine particles
+          12, // particle count
+          3,  // spread
+          0.3 // size
+        );
+        transitionParticles.add(amineParticles);
+        
+        // Create bonding effect particles
+        const bondingParticles = createParticleSystem(
+          molecules[prevDataKey].group.position, 
+          atomColors.NitrosoHighlight, // Red for nitrosamine formation
+          15, // particle count
+          3,  // spread
+          0.15 // size
+        );
+        transitionParticles.add(bondingParticles);
+        
+        // Animate amine particles moving toward nitrosonium ion
+        masterTimeline.to(amineParticles.position, {
+          x: molecules[prevDataKey].group.position.x,
+          y: molecules[prevDataKey].group.position.y,
+          z: molecules[prevDataKey].group.position.z,
+          duration: 1,
+          ease: "power2.inOut"
+        }, 0);
+        
+        // Create a flash at the collision point when amine reaches nitrosonium
+        const flashGeometry = new THREE.SphereGeometry(3, 24, 24);
+        const flashMaterial = new THREE.MeshBasicMaterial({
+          color: atomColors.NitrosoHighlight,
+          transparent: true,
+          opacity: 0,
+          side: THREE.DoubleSide
+        });
+        const flash = new THREE.Mesh(flashGeometry, flashMaterial);
+        flash.position.copy(molecules[prevDataKey].group.position);
+        transitionParticles.add(flash);
+        
+        // Flash when amine hits nitrosonium
+        masterTimeline.to(flash.material, {
+          opacity: 0.5,
+          duration: 0.2,
+          ease: 'power2.in'
+        }, 1.0);
+        
+        // Create a simpler fade transition
+        // Fade out source molecule
+        molecules[prevDataKey].group.traverse(object => {
+          if (object.material) {
+            if (object.material.transparent === undefined) {
+              object.material.transparent = true;
+            }
+            masterTimeline.to(object.material, {
+              opacity: 0,
+              duration: 0.8,
+              ease: 'power2.inOut'
+            }, 1.1);
+          }
+        });
+        
+        // After source fades, show target
+        masterTimeline.call(() => {
+          molecules[prevDataKey].group.visible = false;
+          molecules[newDataKey].group.visible = true;
+          // Reset opacity on source for future use
+          molecules[prevDataKey].group.traverse(object => {
+            if (object.material) {
+              object.material.opacity = 1;
+            }
+          });
+        }, null, 1.9);
+        
+        // Fade in the target molecule
+        molecules[newDataKey].group.traverse(object => {
+          if (object.material) {
+            object.material.transparent = true;
+            object.material.opacity = 0;
+            masterTimeline.to(object.material, {
+              opacity: 1,
+              duration: 0.8,
+              ease: 'power2.inOut'
+            }, 2.0);
+          }
+        });
+        
+        // Fade out the flash
+        masterTimeline.to(flash.material, {
+          opacity: 0,
+          duration: 0.5,
+          ease: 'power2.out'
+        }, 2.0);
+      }
+      else { // Default transition for any other cases
+        console.log('Using default transition animation');
+        
+        // Make sure source and target molecules are properly prepared
+        molecules[prevDataKey].group.visible = true;
+        molecules[newDataKey].group.visible = false;
+        
+        // Create simple transition particles
+        const defaultParticles = createParticleSystem(
+          molecules[prevDataKey].group.position, 
+          0xFFFFFF, // White particles for generic transition
+          15, // particle count
+          4,  // spread
+          0.2 // size
+        );
+        transitionParticles.add(defaultParticles);
+        
+        // Create a simpler fade transition
+        // Fade out source molecule
+        molecules[prevDataKey].group.traverse(object => {
+          if (object.material) {
+            if (object.material.transparent === undefined) {
+              object.material.transparent = true;
+            }
+            masterTimeline.to(object.material, {
+              opacity: 0,
+              duration: 0.8,
+              ease: 'power2.inOut'
+            }, 0.3);
+          }
+        });
+        
+        // After source fades, show target
+        masterTimeline.call(() => {
+          molecules[prevDataKey].group.visible = false;
+          molecules[newDataKey].group.visible = true;
+          // Reset opacity on source for future use
+          molecules[prevDataKey].group.traverse(object => {
+            if (object.material) {
+              object.material.opacity = 1;
+            }
+          });
+        }, null, 1.1);
+        
+        // Fade in the target molecule
+        molecules[newDataKey].group.traverse(object => {
+          if (object.material) {
+            object.material.transparent = true;
+            object.material.opacity = 0;
+            masterTimeline.to(object.material, {
+              opacity: 1,
+              duration: 0.8,
+              ease: 'power2.inOut'
+            }, 1.2);
+          }
+        });
+      }
+      
+      // Cleanup - remove particles at the end of the animation
+      masterTimeline.call(() => {
+        scene.remove(transitionParticles);
+      }, null, 2.5);
+    } else {
+      console.error(`Missing molecule group: ${!molecules[prevDataKey] ? prevDataKey : ''} ${!molecules[newDataKey] ? newDataKey : ''}`);
+      // Fallback - just show the new molecule without animation
+      if (molecules[prevDataKey] && molecules[prevDataKey].group) {
+        molecules[prevDataKey].group.visible = false;
+      }
+      if (molecules[newDataKey] && molecules[newDataKey].group) {
+        molecules[newDataKey].group.visible = true;
+      }
+      // End animation immediately since we can't animate
+      animationPlaying = false;
+      currentStep = step;
+    }
+  
+  // If no direct change needed
+  if (!isDirectChange) {
+    // No transition needed, just simple display of the current step
+    console.log(`Simple display of step ${step} (${newDataKey})`);
+    
+    // Hide all molecules except for the current one
+    moleculeKeys.forEach(key => {
+      if (molecules[key] && molecules[key].group) {
+        molecules[key].group.visible = (key === newDataKey);
+      }
+    });
+    
+    // Update UI
+    updateMoleculeData(newDataKey);
+    updateScientificContext(step);
+    
+    // End animation
+    animationPlaying = false;
+    // Update current step
+    currentStep = step;
+  }
+  
+  // Focus camera on the target molecule
+  try {
+    focusCameraOnCurrentMolecule(step);
+  } catch (error) {
+    console.error('Error focusing camera:', error);
+    // Use default camera position as fallback
+  }
+}
+
+// Create or recreate the stomach environment
+function createStomachEnvironment() {
+  if (molecules.stomach) {
+    // If it exists but might be invisible, make sure it's visible
+    molecules.stomach.visible = true;
+    molecules.stomach.group.visible = true;
+    return;
+  }
+  
+  console.log('Creating stomach environment...');
+  // Create a new stomach environment with consistent object structure
+  molecules.stomach = { group: new THREE.Group(), visible: true };
+  molecules.stomach.group.name = "stomach";
+  
+  // Create a sphere to represent the stomach wall
+  const stomachGeometry = new THREE.SphereGeometry(40, 64, 48);
+  const stomachMaterial = new THREE.MeshPhysicalMaterial({
+    color: 0xe57373,
+    roughness: 0.5,
+    metalness: 0.1,
+    transparent: true,
+    opacity: 0.35,
+    side: THREE.DoubleSide
+  });
+  
+  const stomachMesh = new THREE.Mesh(stomachGeometry, stomachMaterial);
+  stomachMesh.castShadow = true;
+  stomachMesh.receiveShadow = true;
+  stomachMesh.name = "stomach_wall";
+  
+  molecules.stomach.group.add(stomachMesh);
+  scene.add(molecules.stomach.group);
+  
+  // Add some acid particles for visual effect
+  for (let i = 0; i < 20; i++) {
+    const radius = 25 + Math.random() * 10;
+    const theta = Math.random() * Math.PI * 2;
+    const phi = Math.random() * Math.PI;
+    
+    const x = radius * Math.sin(phi) * Math.cos(theta);
+    const y = radius * Math.sin(phi) * Math.sin(theta);
+    const z = radius * Math.cos(phi);
+    
+    const particleGroup = new THREE.Group();
+    particleGroup.position.set(x, y, z);
+    particleGroup.name = `acid_particle_${i}`;
+    
+    // Create a small sphere for each acid particle
+    const particleGeometry = new THREE.SphereGeometry(0.4, 12, 12);
+    const particleMaterial = new THREE.MeshStandardMaterial({
+      color: 0xaaff00,
+      emissive: 0x44aa00,
+      transparent: true,
+      opacity: 0.7
+    });
+    
+    const particleMesh = new THREE.Mesh(particleGeometry, particleMaterial);
+    particleGroup.add(particleMesh);
+    molecules.stomach.group.add(particleGroup);
+  }
+}
+
+// Create a particle system for transitions
+function createParticleSystem(center, color = 0xffffff, count = 20, spread = 5, size = 0.1) {
+  // Create a more dramatic particle system with brighter particles and more of them
+  const particleGeometry = new THREE.BufferGeometry();
+  const positions = new Float32Array(count * 3);
+  const colors = new Float32Array(count * 3);
+  
+  // Convert main color to RGB components
+  const color1 = new THREE.Color(color);
+  const color2 = new THREE.Color(0xffffff); // Secondary color for variation
+  
+  for (let i = 0; i < count; i++) {
+    const i3 = i * 3;
+    // Random position with weighted distribution toward center
+    const distance = Math.pow(Math.random(), 2) * spread; // More particles near center
+    const theta = Math.random() * Math.PI * 2;
+    const phi = Math.random() * Math.PI;
+    
+    positions[i3] = center.x + distance * Math.sin(phi) * Math.cos(theta);
+    positions[i3 + 1] = center.y + distance * Math.sin(phi) * Math.sin(theta);
+    positions[i3 + 2] = center.z + distance * Math.cos(phi);
+    
+    // Gradient color effect - center particles have main color, outer ones fade to secondary
+    const colorMix = Math.random();
+    const particleColor = new THREE.Color().lerpColors(color1, color2, colorMix);
+    
+    colors[i3] = particleColor.r;
+    colors[i3 + 1] = particleColor.g;
+    colors[i3 + 2] = particleColor.b;
+  }
+  
+  particleGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  particleGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  
+  const particleMaterial = new THREE.PointsMaterial({
+    size: size,
+    transparent: true,
+    opacity: 0.9,
+    sizeAttenuation: true,
+    blending: THREE.AdditiveBlending,
+    vertexColors: true,
+    depthWrite: false // Prevents z-fighting and makes particles more visible
+  });
+  
+  const particles = new THREE.Points(particleGeometry, particleMaterial);
+  return particles;
+}
+
+// ...
+
+// Show the current step with enhanced animation transitions
+function showStepImplementation(step) {
+  // Validate step is within bounds
+  if (step < 0 || step > totalSteps) return;
+  
+  console.log('showStep called for step:', step, 'current animation flag:', animationPlaying);
+  
+  // Set animation flag
+  animationPlaying = true;
+  
+  // Ensure proper molecule objects structure
+  const moleculeKeys = ['sodiumNitrite', 'nitrousAcid', 'decomposed', 'nitrosamine'];
+  moleculeKeys.forEach(key => {
+    if (!molecules[key]) {
+      molecules[key] = { 
+        group: new THREE.Group(), 
+        visible: false 
+      };
+      molecules[key].group.name = key;
+      scene.add(molecules[key].group);
+    } else if (!molecules[key].group) {
+      molecules[key].group = new THREE.Group();
+      molecules[key].group.name = key;
+      scene.add(molecules[key].group);
+    }
+  });
+  
+  // Make sure stomach environment is visible for all steps
+  if (molecules.stomach) {
+    molecules.stomach.visible = true;
+    molecules.stomach.group.visible = true;
+  } else {
+    console.warn('Stomach environment not found!');
+    // Try to recreate it if missing
+    createStomachEnvironment();
+  }
+  
+  // Add a safety timeout to prevent animations from getting stuck
+  if (window.animationResetTimeout) {
+    clearTimeout(window.animationResetTimeout);
+  }
+  
+  // Safety mechanism: if animation gets stuck, reset after 10 seconds
+  window.animationResetTimeout = setTimeout(() => {
+    console.log('Animation safety timeout triggered after 10 seconds');
     animationPlaying = false;
   }, 10000);
   
   // Get the data keys for the previous and current steps
-  const prevDataKey = getDataKeyForStep(currentStep);
-  const newDataKey = getDataKeyForStep(step);
+  let prevDataKey = getDataKeyForStep(currentStep);
+  let newDataKey = getDataKeyForStep(step);
   
   // Check if this is a direct step change (e.g., via next/prev buttons)
-  // or if it's a first load (0 to 0)
-  const isDirectChange = step !== currentStep || step === 0;
+  const isDirectChange = step !== currentStep;
   
-  // If this is an actual step change and both molecules exist, do a transition
-  if (isDirectChange && molecules[prevDataKey] && molecules[newDataKey] && step !== currentStep) {
-    console.log(`Transitioning from ${prevDataKey} to ${newDataKey}`);
-    
-    // Hide all molecules except the ones involved in the transition
-    Object.keys(molecules).forEach(key => {
-      if (key !== prevDataKey && key !== newDataKey) {
-        molecules[key].visible = false;
-      }
-    });
-    
-    // Make the previous molecule visible for transition
-    if (molecules[prevDataKey]) {
-      molecules[prevDataKey].visible = true;
+  console.log(`Transitioning from ${prevDataKey} to ${newDataKey}`);
+  
+  // IMPORTANT: Ensure all molecules are properly initialized and have groups
+  const ensureMoleculeExists = (key) => {
+    if (!molecules[key]) {
+      console.log(`Creating molecule container for ${key}`);
+      molecules[key] = { group: new THREE.Group(), visible: false };
+      scene.add(molecules[key].group);
+      return false;
     }
     
-    // Set up a timeline for a smooth transition
+    if (!molecules[key].group) {
+      console.log(`Creating group for ${key}`);
+      molecules[key].group = new THREE.Group();
+      scene.add(molecules[key].group);
+      return false;
+    }
+    
+    return true;
+  };
+  
+  // Make sure all molecule types exist
+  const prevExists = ensureMoleculeExists(prevDataKey);
+  const newExists = ensureMoleculeExists(newDataKey);
+  
+  // Ensure stomach is visible during transitions
+  if (molecules.stomach) {
+    molecules.stomach.visible = true;
+    molecules.stomach.group.visible = true;
+  }
+  
+  // Make sure transition particles are shown regardless
+  const showTransition = true;
+  
+  // Only do full animation if actually changing steps
+  if (isDirectChange) {
+    // Create a particle effect for the transition at stomach center
+    const stomachCenter = new THREE.Vector3(0, 0, 0);
+    const transitionParticles = createParticleSystem(
+      stomachCenter,
+      0x66ccff, // Blue particles
+      40,        // More particles for better effect
+      12,        // Broader spread
+      0.2        // Larger particles
+    );
+    scene.add(transitionParticles);
+    
+    // Make sure both molecules are properly positioned and visible
+    if (molecules[prevDataKey] && molecules[prevDataKey].group) {
+      molecules[prevDataKey].group.visible = true;
+    }
+    
+    if (molecules[newDataKey] && molecules[newDataKey].group) {
+      // Position new molecule at same position initially
+      if (molecules[prevDataKey] && molecules[prevDataKey].group) {
+        molecules[newDataKey].group.position.copy(molecules[prevDataKey].group.position);
+      }
+      // Initially hide the target molecule
+      molecules[newDataKey].group.visible = false;
+      // Prepare scale for animation
+      molecules[newDataKey].group.scale.set(0.8, 0.8, 0.8);
+    }
+    
+    // Set up a timeline for a smooth transition with more effects
     const timeline = gsap.timeline({
       onComplete: () => {
-        // Hide previous molecule when transition completes
-        if (molecules[prevDataKey]) {
-          molecules[prevDataKey].visible = false;
+        console.log('Animation complete, setting animationPlaying to false');
+        // Hide previous molecule
+        if (molecules[prevDataKey] && molecules[prevDataKey].group) {
+          molecules[prevDataKey].group.visible = false;
         }
-        
-        // Only the new molecule should be visible
-        if (molecules[newDataKey]) {
-          molecules[newDataKey].visible = true;
+        // Make sure new molecule is visible
+        if (molecules[newDataKey] && molecules[newDataKey].group) {
+          molecules[newDataKey].group.visible = true;
         }
-        
-        // End the animation state
+        // Remove particles
+        scene.remove(transitionParticles);
+        // Animation is done
         animationPlaying = false;
-        
-        console.log('Animation complete');
+        // Update current step
+        currentStep = step;
       }
     });
     
     // Focus camera on the target molecule
-    focusCameraOnCurrentMolecule(step);
+    try {
+      focusCameraOnCurrentMolecule(step);
+    } catch (error) {
+      console.error('Error focusing camera:', error);
+      // Use default camera position as fallback
+      controls.target.set(0, 0, 0);
+    }
     
-    // If available, run the transition between molecules
-    if (molecules[prevDataKey] && molecules[newDataKey]) {
-      timeline.add(() => {
-        // Use the existing transition function
-        console.log('Molecule transition started');
-        if (typeof transitionMolecules === 'function') {
-          transitionMolecules(molecules[prevDataKey], molecules[newDataKey]);
+    // Ensure molecules are visible during transition
+    if (molecules[prevDataKey] && molecules[prevDataKey].group) {
+      molecules[prevDataKey].group.visible = true;
+    }
+    
+    if (molecules[newDataKey] && molecules[newDataKey].group) {
+      // Initially hide target molecule
+      molecules[newDataKey].group.visible = false;
+    }
+    
+    // Create center point for transition effects
+    const centerPoint = new THREE.Vector3(0, 0, 0);
+    
+    // Create transition particles at the center point with more dramatic colors and sizes
+    const centerParticles = createParticleSystem(
+      centerPoint,
+      0x00ffff, // Bright cyan glow
+      60, // Many more particles for better visibility
+      15, // Much wider spread
+      0.3 // Larger particles
+    );
+    scene.add(centerParticles);
+    
+    // Add a dramatic flash effect with brighter colors and bigger size for more visibility
+    const flashGeometry = new THREE.SphereGeometry(5, 32, 32);
+    const flashMaterial = new THREE.MeshBasicMaterial({
+      color: 0x00ffff,
+      transparent: true,
+      opacity: 0,
+      emissive: 0x00ffff,
+      emissiveIntensity: 2.0
+    });
+    const flash = new THREE.Mesh(flashGeometry, flashMaterial);
+    flash.scale.set(1, 1, 1);
+    flash.position.copy(centerPoint);
+    scene.add(flash);
+    
+    // 1. Start with a much more dramatic flash effect
+    timeline.to(flash.scale, {
+      x: 30, // Much larger scale for more visibility
+      y: 30,
+      z: 30,
+      duration: 1.0, // Longer duration to be more noticeable
+      ease: 'elastic.out(1, 0.5)' // Elastic effect for more drama
+    }, 0);
+    
+    timeline.to(flash.material, {
+      opacity: 0.9, // Higher peak opacity
+      duration: 0.5,
+      ease: 'power1.out',
+      onComplete: () => {
+        // Create a pulsing effect for the flash
+        gsap.to(flash.material, {
+          opacity: 0.3,
+          duration: 0.3,
+          ease: 'power2.in',
+          repeat: 2,
+          yoyo: true,
+          onComplete: () => {
+            // Final fade out
+            gsap.to(flash.material, {
+              opacity: 0,
+              duration: 0.7,
+              ease: 'power2.in'
+            });
+          }
+        });
+      }
+    }, 0);
+    
+    // 2. Fade out previous molecule with scale effect
+    if (molecules[prevDataKey] && molecules[prevDataKey].group) {
+      timeline.to(molecules[prevDataKey].group.scale, {
+        x: 0.7,
+        y: 0.7,
+        z: 0.7,
+        duration: 0.6,
+        ease: 'power2.in'
+      }, 0.4);
+      
+      // Traverse all objects and fade their materials
+      molecules[prevDataKey].group.traverse(obj => {
+        if (obj.material) {
+          // Ensure material can fade
+          obj.material.transparent = true;
+          timeline.to(obj.material, {
+            opacity: 0,
+            duration: 0.6,
+            ease: 'power2.in'
+          }, 0.4);
         }
       });
     }
+    
+    // 3. Animate particles
+    centerParticles.children.forEach((particle, i) => {
+      const direction = new THREE.Vector3(
+        Math.random() * 2 - 1,
+        Math.random() * 2 - 1,
+        Math.random() * 2 - 1
+      ).normalize();
+      
+      const distance = 3 + Math.random() * 7;
+      const duration = 0.8 + Math.random() * 0.4;
+      const delay = 0.3 + (i / centerParticles.children.length) * 0.3;
+      
+      timeline.to(particle.position, {
+        x: particle.position.x + direction.x * distance,
+        y: particle.position.y + direction.y * distance,
+        z: particle.position.z + direction.z * distance,
+        duration: duration,
+        ease: 'power1.out',
+        delay: delay
+      }, 0.3);
+      
+      timeline.to(particle.material, {
+        opacity: 0,
+        duration: duration * 0.7,
+        ease: 'power2.in',
+        delay: delay + duration * 0.3
+      }, 0.3);
+    });
+    
+    // 4. Fade in new molecule
+    timeline.add(() => {
+      // First hide the old molecule completely
+      if (molecules[prevDataKey] && molecules[prevDataKey].group) {
+        molecules[prevDataKey].group.visible = false;
+      }
+      
+      // Show the new molecule
+      if (molecules[newDataKey] && molecules[newDataKey].group) {
+        molecules[newDataKey].group.visible = true;
+        molecules[newDataKey].group.scale.set(0.7, 0.7, 0.7);
+        
+        // Make sure materials are set up for fading in
+        molecules[newDataKey].group.traverse(obj => {
+          if (obj.material) {
+            obj.material.transparent = true;
+            obj.material.opacity = 0;
+          }
+        });
+      }
+    }, 1.0);
+    
+    // Scale up the new molecule
+    if (molecules[newDataKey] && molecules[newDataKey].group) {
+      timeline.to(molecules[newDataKey].group.scale, {
+        x: 1,
+        y: 1,
+        z: 1,
+        duration: 0.8,
+        ease: 'back.out(1.2)'
+      }, 1.2);
+      
+      // Fade in all materials
+      timeline.add(() => {
+        molecules[newDataKey].group.traverse(obj => {
+          if (obj.material) {
+            gsap.to(obj.material, {
+              opacity: 1,
+              duration: 0.8,
+              ease: 'power2.out'
+            });
+          }
+        });
+      }, 1.2);
+    }
+    
+    // Clean up effects at the end
+    timeline.add(() => {
+      scene.remove(flash);
+      scene.remove(centerParticles);
+    }, 2.0);
   } else {
     // Simple display without transition (first load or step doesn't change)
     console.log(`Simple display of step ${step} (${newDataKey})`);
@@ -3048,13 +3958,285 @@ function showStepImplementation(step) {
   
   // Update step title in the bottom indicator
   updateStepTitle(step);
+} // End of showStepImplementation function
+
+// New function to handle transitions between steps
+function transitionBetweenSteps(fromStep, toStep) {
+  // Set animation playing flag
+  animationPlaying = true;
+  
+  // Convert steps to data keys
+  const fromKey = getDataKeyForStep(fromStep);
+  const toKey = getDataKeyForStep(toStep);
+  
+  console.log(`Transitioning from ${fromKey} (step ${fromStep}) to ${toKey} (step ${toStep})`);
+  
+  // Make sure the right molecule is visible at the start
+  Object.keys(molecules).forEach(key => {
+    if (molecules[key] && molecules[key].group) {
+      molecules[key].group.visible = (key === fromKey);
+      
+      // Make sure opacity is reset for all molecules
+      molecules[key].group.traverse(object => {
+        if (object.material) {
+          object.material.transparent = true;
+          if (key === fromKey) {
+            object.material.opacity = 1.0;
+          } else if (key === toKey) {
+            object.material.opacity = 0.0;
+          }
+        }
+      });
+    }
+  });
+  
+  // Create particles for the transition
+  const particles = new THREE.Group();
+  scene.add(particles);
+  
+  // Add different types of particles based on the transition type
+  if (fromStep === 0 && toStep === 1) { // Sodium Nitrite to Nitrous Acid
+    // Add acid particles
+    for (let i = 0; i < 20; i++) {
+      const geometry = new THREE.SphereGeometry(0.15, 8, 8);
+      const material = new THREE.MeshBasicMaterial({
+        color: 0xFFFFFF,
+        transparent: true,
+        opacity: 0.7
+      });
+      const particle = new THREE.Mesh(geometry, material);
+      
+      // Position around the source molecule - with safety checks
+      let pos;
+      if (molecules[fromKey] && molecules[fromKey].group && molecules[fromKey].group.position) {
+        pos = molecules[fromKey].group.position.clone();
+      } else {
+        // Use a default position if the molecule group doesn't exist yet
+        console.warn(`Source molecule ${fromKey} position not available, using default`);
+        pos = new THREE.Vector3(0, 0, 0);
+      }
+      
+      pos.x += (Math.random() - 0.5) * 8;
+      pos.y += (Math.random() - 0.5) * 8;
+      pos.z += (Math.random() - 0.5) * 8;
+      particle.position.copy(pos);
+      
+      particles.add(particle);
+    }
+  } else if (fromStep === 1 && toStep === 2) { // Nitrous Acid to Nitrosonium Ion
+    // Add decomposition particles
+    for (let i = 0; i < 15; i++) {
+      const geometry = new THREE.SphereGeometry(0.2, 8, 8);
+      const material = new THREE.MeshBasicMaterial({
+        color: 0xFFA726, // orange
+        transparent: true,
+        opacity: 0.7
+      });
+      const particle = new THREE.Mesh(geometry, material);
+      
+      // Position at the source molecule with safety check
+      if (molecules[fromKey] && molecules[fromKey].group && molecules[fromKey].group.position) {
+        particle.position.copy(molecules[fromKey].group.position);
+      } else {
+        console.warn(`Source molecule ${fromKey} position not available, using default`);
+        particle.position.set(0, 0, 0);
+      }
+      
+      particles.add(particle);
+    }
+  } else if (fromStep === 2 && toStep === 3) { // Nitrosonium Ion to Nitrosamine
+    // Add amine particles approaching
+    for (let i = 0; i < 12; i++) {
+      const geometry = new THREE.SphereGeometry(0.2, 8, 8);
+      const material = new THREE.MeshBasicMaterial({
+        color: 0xFF5252, // red
+        transparent: true,
+        opacity: 0.7
+      });
+      const particle = new THREE.Mesh(geometry, material);
+      
+      // Position to the right of the molecule with safety check
+      let pos;
+      if (molecules[fromKey] && molecules[fromKey].group && molecules[fromKey].group.position) {
+        pos = molecules[fromKey].group.position.clone();
+        pos.x += 5 + Math.random() * 3;
+        pos.y += (Math.random() - 0.5) * 4;
+        pos.z += (Math.random() - 0.5) * 4;
+      } else {
+        console.warn(`Source molecule ${fromKey} position not available, using default`);
+        pos = new THREE.Vector3(
+          5 + Math.random() * 3,
+          (Math.random() - 0.5) * 4,
+          (Math.random() - 0.5) * 4
+        );
+      }
+      particle.position.copy(pos);
+      
+      particles.add(particle);
+    }
+  }
+  
+  // Do the actual transition animation
+  const duration = 1.5; // seconds
+  
+  // Animate the particles
+  particles.children.forEach((particle, i) => {
+    // Give each particle a random movement
+    gsap.to(particle.position, {
+      x: particle.position.x + (Math.random() - 0.5) * 5,
+      y: particle.position.y + (Math.random() - 0.5) * 5,
+      z: particle.position.z + (Math.random() - 0.5) * 5,
+      duration: duration * 0.8,
+      delay: Math.random() * 0.3,
+      ease: 'power1.out'
+    });
+    
+    // Fade out particles at the end
+    if (particle.material && particle.material.opacity !== undefined) {
+      gsap.to(particle.material, {
+        opacity: 0,
+        duration: duration * 0.4,
+        delay: duration * 0.6,
+        ease: 'power1.in'
+      });
+    }
+  });
+  
+  // Fade out source molecule with safety check
+  if (molecules[fromKey] && molecules[fromKey].group && molecules[fromKey].group.children) {
+    // We need to animate each child's material opacity individually
+    molecules[fromKey].group.traverse(object => {
+      if (object.material && object.material.opacity !== undefined) {
+        gsap.to(object.material, {
+          opacity: 0,
+          duration: duration * 0.6,
+          delay: Math.random() * 0.1, // Staggered effect
+          ease: 'power1.in'
+        });
+      }
+    });
+    
+    // Set a timeout to hide the source and show target after animation completes
+    setTimeout(() => {
+      // Hide the source molecule
+      if (molecules[fromKey] && molecules[fromKey].group) {
+        molecules[fromKey].group.visible = false;
+      }
+      // Show the target molecule
+      if (molecules[toKey] && molecules[toKey].group) {
+        molecules[toKey].group.visible = true;
+      }
+    }, duration * 0.6 * 1000); // Convert to milliseconds
+  } else {
+    console.warn(`Source molecule ${fromKey} not available for fade out animation`);
+    // Still try to show target molecule
+    if (molecules[toKey] && molecules[toKey].group) {
+      molecules[toKey].group.visible = true;
+    }
+  }
+  
+  // Fade in target molecule after a delay with safety check
+  if (molecules[toKey] && molecules[toKey].group && molecules[toKey].group.children) {
+    // First ensure all materials have proper starting opacity
+    molecules[toKey].group.traverse(object => {
+      if (object.material) {
+        object.material.transparent = true;
+        object.material.opacity = 0;
+      }
+    });
+    
+    // Delay before starting fade-in
+    setTimeout(() => {
+      // Animate each child's material opacity individually
+      molecules[toKey].group.traverse(object => {
+        if (object.material && object.material.opacity !== undefined) {
+          gsap.to(object.material, {
+            opacity: 1,
+            duration: duration * 0.6,
+            delay: Math.random() * 0.15, // Staggered effect
+            ease: 'power1.out'
+          });
+        }
+      });
+      
+      // Set completion handler
+      setTimeout(() => {
+        // Update UI
+        updateStepTitle(toStep);
+        updateStepIndicator(toStep);
+        updateNavigationButtons(toStep);
+        updateMoleculeData(toKey);
+        updateScientificContext(toStep);
+        
+        // Clean up
+        scene.remove(particles);
+        
+        // End animation
+        animationPlaying = false;
+      }, duration * 0.6 * 1000);
+    }, duration * 0.5 * 1000);
+  } else {
+    console.warn(`Target molecule ${toKey} not available for fade in animation`);
+    
+    // Still update UI and cleanup even if animation fails
+    updateStepTitle(toStep);
+    updateStepIndicator(toStep);
+    updateNavigationButtons(toStep);
+    updateMoleculeData(toKey);
+    updateScientificContext(toStep);
+    
+    // Clean up
+    scene.remove(particles);
+    
+    // End animation
+    animationPlaying = false;
+  }
+  
+  // Focus camera on the target molecule
+  try {
+    focusCameraOnCurrentMolecule(toStep);
+  } catch (error) {
+    console.error('Error focusing camera:', error);
+  }
+  
+  // Safety timeout to prevent stuck animations
+  if (window.animationResetTimeout) {
+    clearTimeout(window.animationResetTimeout);
+  }
+  window.animationResetTimeout = setTimeout(() => {
+    console.log('Safety timeout triggered - resetting animation state');
+    animationPlaying = false;
+  }, 5000);
 }
 
+// This function is now just used for the initial state setup
 function showStep(step) {
-  // This is a wrapper function that calls the main implementation
-  // This ensures any code that calls showStep will use the proper implementation
-  // that handles the transitions and animations
-  showStepImplementation(step);
+  // Prevent animation conflicts
+  if (animationPlaying) {
+    console.log('Animation already in progress, ignoring');
+    return;
+  }
+  
+  // Just directly show the molecule for the given step without animation
+  const dataKey = getDataKeyForStep(step);
+  
+  // Hide all molecules
+  Object.keys(molecules).forEach(key => {
+    if (molecules[key] && molecules[key].group) {
+      molecules[key].group.visible = (key === dataKey);
+    }
+  });
+  
+  // Update UI
+  currentStep = step;
+  updateStepTitle(step);
+  updateStepIndicator(step);
+  updateNavigationButtons(step);
+  updateMoleculeData(dataKey);
+  updateScientificContext(step);
+  
+  // Focus camera
+  focusCameraOnCurrentMolecule(step);
 }
 
 // Go to next step
@@ -3066,9 +4248,14 @@ function nextStep() {
   }
   
   if (currentStep < totalSteps) {
-    console.log('Moving to step:', currentStep + 1);
-    currentStep++;
-    showStep(currentStep);
+    const targetStep = currentStep + 1;
+    console.log('Moving to step:', targetStep);
+    // Save previous step before advancing
+    const previousStep = currentStep;
+    // Update current step
+    currentStep = targetStep;
+    // Call the transition function with both steps as parameters
+    transitionBetweenSteps(previousStep, targetStep);
     
     // Close the sidebar on mobile after changing step
     if (isMobile()) {
@@ -3105,9 +4292,14 @@ function previousStep() {
   }
   
   if (currentStep > 0) {
-    console.log('Moving to step:', currentStep - 1);
-    currentStep--;
-    showStep(currentStep);
+    const targetStep = currentStep - 1;
+    console.log('Moving to step:', targetStep);
+    // Save previous step before going back
+    const previousStep = currentStep;
+    // Update current step
+    currentStep = targetStep;
+    // Call the transition function with both steps as parameters
+    transitionBetweenSteps(previousStep, targetStep);
     
     // Close the sidebar on mobile after changing step
     if (isMobile()) {
@@ -3255,8 +4447,16 @@ function onWindowResize() {
   effectFXAA.uniforms.resolution.value.set(1 / window.innerWidth, 1 / window.innerHeight);
   composer.setSize(window.innerWidth, window.innerHeight);
   
-  // Update camera FOV for better mobile viewing
-  if (isMobile()) {
+  // Get info panel element
+  const infoPanel = document.getElementById("info-panel");
+  
+  // Ensure sidebar is always visible on desktop
+  if (!isMobile() && infoPanel) {
+    // Make sure the panel is visible on desktop
+    infoPanel.classList.remove('-translate-x-full');
+    infoPanel.classList.add('translate-x-0');
+  } else if (isMobile()) {
+    // Handle mobile devices differently
     // Adjust FOV based on orientation
     if (window.innerWidth < window.innerHeight) {
       // Portrait orientation needs wider FOV
@@ -3267,9 +4467,8 @@ function onWindowResize() {
     }
     camera.updateProjectionMatrix();
     
-    // Handle info panel visibility based on screen size
-    const infoPanel = document.getElementById("info-panel");
-    if (window.innerWidth < 768 && infoPanel.classList.contains("visible")) {
+    // On mobile, sidebar should be hideable
+    if (window.innerWidth < 768 && infoPanel && infoPanel.classList.contains("visible")) {
       infoPanel.classList.remove("visible");
     }
   }
@@ -3279,36 +4478,41 @@ function onWindowResize() {
 function animate() {
   requestAnimationFrame(animate);
   
-  // Update controls
+  // Update controls with dampening to prevent jitter
   controls.update();
-  
-  // Optimize performance for mobile
-  if (isMobile()) {
-    // Use standard rendering for better performance on mobile
-    renderer.render(scene, camera);
-    
-    // Only use composer with special effects occasionally on mobile to save power
-    if (Math.random() < 0.2) { // Only 20% of frames get full post-processing on mobile
-      composer.render();
-    }
-  } else {
-    // Use full quality on desktop
-    composer.render();
-  }
-  
-  // Optimize any animated particles or effects based on device capability
-  if (transitionEffects.children.length > 0) {
-    const maxParticles = isMobile() ? 15 : 50; // Fewer particles on mobile
-    
-    // If we have too many particles for the device, randomly remove some
-    while (transitionEffects.children.length > maxParticles) {
-      const randomIndex = Math.floor(Math.random() * transitionEffects.children.length);
-      transitionEffects.remove(transitionEffects.children[randomIndex]);
-    }
-  }
   
   // Use a time-based animation instead of frame-based for smoother motion
   const time = performance.now() * 0.001; // Convert to seconds
+  
+  // Ensure stomach is always visible
+  if (molecules.stomach) {
+    molecules.stomach.visible = true;
+    molecules.stomach.group.visible = true;
+    
+    // Animate stomach atoms with random movement
+    molecules.stomach.group.children.forEach((child, index) => {
+      // Only animate certain atoms (exclude the stomach mesh itself)
+      if (child.name && (child.name.includes('water_') || child.name.includes('hcl_') || child.name.includes('bicarb'))) {
+        // Create subtle random movements
+        const moveFactor = 0.005;
+        const rotationFactor = 0.002;
+        
+        // Use time and index to create different patterns for each atom
+        const xMovement = Math.sin(time * 0.5 + index) * moveFactor;
+        const yMovement = Math.cos(time * 0.7 + index * 0.3) * moveFactor;
+        const zMovement = Math.sin(time * 0.3 + index * 0.7) * moveFactor;
+        
+        // Apply the movement
+        child.position.x += xMovement;
+        child.position.y += yMovement;
+        child.position.z += zMovement;
+        
+        // Add subtle rotation
+        child.rotation.x += Math.sin(time * 0.2 + index) * rotationFactor;
+        child.rotation.y += Math.cos(time * 0.3 + index * 0.5) * rotationFactor;
+      }
+    });
+  }
   
   // Update electron positions in electron shells more efficiently
   // Only traverse objects that need animation
@@ -3323,9 +4527,32 @@ function animate() {
       }
     }
   });
-
-  // Render with post-processing effects
-  composer.render();
+  
+  // Optimize any animated particles or effects based on device capability
+  if (transitionEffects.children.length > 0) {
+    const maxParticles = isMobile() ? 15 : 50; // Fewer particles on mobile
+    
+    // If we have too many particles for the device, randomly remove some
+    while (transitionEffects.children.length > maxParticles) {
+      const randomIndex = Math.floor(Math.random() * transitionEffects.children.length);
+      transitionEffects.remove(transitionEffects.children[randomIndex]);
+    }
+  }
+  
+  try {
+    // Rendering with proper optimization for different devices
+    if (isMobile()) {
+      // Use standard rendering for better performance on mobile
+      renderer.render(scene, camera);
+    } else {
+      // Use full quality on desktop - only call composer.render() once
+      composer.render();
+    }
+  } catch (error) {
+    console.error('Render error:', error);
+    // Fallback to standard rendering if composer fails
+    renderer.render(scene, camera);
+  }
 }
 
 // Initialize when the page loads
